@@ -436,8 +436,10 @@ function waitForGoogle(cb, tries=0) {
 }
 
 function signIn() {
-  setSyncStatus('orange', 'Loading Google sign-in…');
+  setSyncStatus('orange', 'Button tapped — loading…');
+  alert('Sign in button tapped! Waiting for Google…');
   waitForGoogle(() => {
+    alert('Google loaded! Opening sign-in popup…');
     try {
       const client = google.accounts.oauth2.initTokenClient({
         client_id: CLIENT_ID,
