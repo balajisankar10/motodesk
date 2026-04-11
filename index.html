@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>MotoDesk — Business Manager</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet"/>
-<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="https://accounts.google.com/gsi/client"></script>
 <style>
   :root {
     --bg: #0f0f0f;
@@ -429,21 +429,39 @@ const DB = {
 };
 
 // ─── GOOGLE AUTH ──────────────────────────────────────────────────────────────
+function waitForGoogle(cb, tries=0) {
+  if(typeof google !== 'undefined' && google.accounts) { cb(); return; }
+  if(tries > 30) { alert('Google sign-in failed to load. Please check your internet connection and reload the page.'); return; }
+  setTimeout(() => waitForGoogle(cb, tries+1), 300);
+}
+
 function signIn() {
-  const client = google.accounts.oauth2.initTokenClient({
-    client_id: CLIENT_ID,
-    scope: SCOPES,
-    callback: async (resp) => {
-      if(resp.error) { setSyncStatus('red', 'Sign in failed'); return; }
-      accessToken = resp.access_token;
-      localStorage.setItem('accessToken', accessToken);
-      setSyncStatus('orange', 'Signed in, loading data…');
-      showApp();
-      await initSheet();
-      await loadFromSheet();
+  setSyncStatus('orange', 'Loading Google sign-in…');
+  waitForGoogle(() => {
+    try {
+      const client = google.accounts.oauth2.initTokenClient({
+        client_id: CLIENT_ID,
+        scope: SCOPES,
+        callback: async (resp) => {
+          if(resp.error) {
+            setSyncStatus('red', 'Sign in failed: ' + (resp.error_description || resp.error));
+            alert('Sign in failed: ' + (resp.error_description || resp.error));
+            return;
+          }
+          accessToken = resp.access_token;
+          localStorage.setItem('accessToken', accessToken);
+          setSyncStatus('orange', 'Signed in, loading data…');
+          showApp();
+          await initSheet();
+          await loadFromSheet();
+        }
+      });
+      client.requestAccessToken();
+    } catch(e) {
+      setSyncStatus('red', 'Error: ' + e.message);
+      alert('Sign in error: ' + e.message);
     }
   });
-  client.requestAccessToken();
 }
 
 function signOut() {
@@ -947,44 +965,44 @@ document.querySelectorAll('.modal-overlay').forEach(o=>{
 });
 
 // ─── INIT ─────────────────────────────────────────────────────────────────────
-// Try to restore session from localStorage cache while waiting for sign-in
-motos    = DB.load('motos');
-expenses = DB.load('expenses');
+async function init() {
+  motos    = DB.load('motos');
+  expenses = DB.load('expenses');
 
-// Check if we have a stored token (page reload scenario)
-const storedToken = localStorage.getItem('accessToken');
-if(storedToken) {
-  accessToken = storedToken;
-  showApp();
-  setSyncStatus('orange', 'Restoring session…');
-  // Re-request token silently
-  window.addEventListener('load', () => {
-    try {
-      const client = google.accounts.oauth2.initTokenClient({
-        client_id: CLIENT_ID,
-        scope: SCOPES,
-        prompt: '',
-        callback: async (resp) => {
-          if(resp.error) { setSyncStatus('grey','Session expired — please sign in'); return; }
-          accessToken = resp.access_token;
-          localStorage.setItem('accessToken', accessToken);
-          await initSheet();
-          await loadFromSheet();
-        }
-      });
-      client.requestAccessToken({prompt:''});
-    } catch(e) {
-      // Show with local data
-      renderDashboard();
-      setSyncStatus('grey','Sign in to sync');
-    }
-  });
-  renderDashboard();
-} else {
-  // Show login screen
-  document.getElementById('login-screen').style.display = 'flex';
-  document.getElementById('app-content').style.display  = 'none';
+  const storedToken = localStorage.getItem('accessToken');
+  if(storedToken) {
+    accessToken = storedToken;
+    showApp();
+    setSyncStatus('orange', 'Restoring session…');
+    renderDashboard();
+    // Re-request token silently
+    waitForGoogle(() => {
+      try {
+        const client = google.accounts.oauth2.initTokenClient({
+          client_id: CLIENT_ID,
+          scope: SCOPES,
+          prompt: '',
+          callback: async (resp) => {
+            if(resp.error) { setSyncStatus('grey','Session expired — please sign in again'); return; }
+            accessToken = resp.access_token;
+            localStorage.setItem('accessToken', accessToken);
+            await initSheet();
+            await loadFromSheet();
+          }
+        });
+        client.requestAccessToken({prompt:''});
+      } catch(e) {
+        renderDashboard();
+        setSyncStatus('grey','Sign in to sync');
+      }
+    });
+  } else {
+    document.getElementById('login-screen').style.display = 'flex';
+    document.getElementById('app-content').style.display  = 'none';
+  }
 }
+
+init();
 </script>
 </body>
 </html>
