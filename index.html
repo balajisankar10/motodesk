@@ -1,0 +1,1011 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>MotoDesk — Business Manager</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet"/>
+<script src="https://accounts.google.com/gsi/client"></script>
+<style>
+  :root {
+    --bg: #0f0f0f;
+    --surface: #181818;
+    --surface2: #222222;
+    --border: #2e2e2e;
+    --accent: #f4a11b;
+    --accent2: #e05c2a;
+    --text: #f0ede8;
+    --muted: #888;
+    --green: #3ecf8e;
+    --red: #ff6b6b;
+    --blue: #60a5fa;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  .sync-bar {
+    background: var(--surface2); border-bottom: 1px solid var(--border);
+    padding: 6px 16px; font-size: 12px; display: flex;
+    align-items: center; justify-content: space-between; gap: 8px;
+  }
+  .sync-dot { width:8px; height:8px; border-radius:50%; display:inline-block; margin-right:6px; }
+  .sync-dot.green { background:var(--green); }
+  .sync-dot.orange { background:var(--accent); animation: pulse 1.5s infinite; }
+  .sync-dot.red { background:var(--red); }
+  .sync-dot.grey { background:var(--muted); }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+  .login-screen {
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    min-height:80vh; text-align:center; padding:32px;
+  }
+  .login-icon { font-size:64px; margin-bottom:16px; }
+  .login-title { font-family:'Bebas Neue',sans-serif; font-size:36px; letter-spacing:2px; color:var(--accent); margin-bottom:8px; }
+  .login-sub { color:var(--muted); font-size:14px; margin-bottom:32px; max-width:300px; line-height:1.6; }
+  body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; min-height: 100vh; }
+
+  /* NAV */
+  nav {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 58px;
+    position: sticky; top: 0; z-index: 100;
+  }
+  .logo { font-family: 'Bebas Neue', sans-serif; font-size: 26px; letter-spacing: 2px; color: var(--accent); display: flex; align-items: center; gap: 8px; }
+  .logo span { color: var(--text); }
+  .nav-tabs { display: flex; gap: 4px; overflow-x: auto; }
+  .nav-tab {
+    background: none; border: none; color: var(--muted);
+    font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500;
+    padding: 6px 12px; border-radius: 6px; cursor: pointer;
+    white-space: nowrap; transition: all .2s;
+  }
+  .nav-tab.active { background: var(--accent); color: #000; font-weight: 600; }
+  .nav-tab:hover:not(.active) { background: var(--surface2); color: var(--text); }
+
+  /* LAYOUT */
+  .page { display: none; padding: 20px 16px; max-width: 900px; margin: 0 auto; }
+  .page.active { display: block; }
+
+  /* DASHBOARD */
+  .stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 24px; }
+  @media(min-width:600px){ .stats-grid { grid-template-columns: repeat(4, 1fr); } }
+  .stat-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 16px;
+  }
+  .stat-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
+  .stat-value { font-family: 'Bebas Neue', sans-serif; font-size: 32px; line-height: 1; }
+  .stat-value.green { color: var(--green); }
+  .stat-value.orange { color: var(--accent); }
+  .stat-value.red { color: var(--red); }
+  .stat-value.blue { color: var(--blue); }
+
+  .section-title {
+    font-family: 'Bebas Neue', sans-serif; font-size: 20px;
+    letter-spacing: 1.5px; color: var(--accent);
+    margin-bottom: 14px; margin-top: 8px;
+    display: flex; align-items: center; gap: 8px;
+  }
+
+  /* CARDS / TABLE */
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; overflow: hidden; margin-bottom: 12px;
+  }
+  .card-header {
+    padding: 14px 16px;
+    background: var(--surface2);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .card-body { padding: 16px; }
+
+  /* FORM */
+  .form-grid { display: grid; gap: 12px; }
+  .form-grid-2 { grid-template-columns: 1fr 1fr; }
+  @media(max-width:500px){ .form-grid-2 { grid-template-columns: 1fr; } }
+  .field { display: flex; flex-direction: column; gap: 5px; }
+  label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .8px; }
+  input, select, textarea {
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text); border-radius: 8px;
+    padding: 10px 12px; font-family: 'DM Sans', sans-serif; font-size: 14px;
+    outline: none; transition: border .2s; width: 100%;
+  }
+  input:focus, select:focus, textarea:focus { border-color: var(--accent); }
+  select option { background: var(--surface2); }
+  textarea { resize: vertical; min-height: 70px; }
+
+  /* BUTTONS */
+  .btn {
+    padding: 10px 18px; border-radius: 8px; border: none;
+    font-family: 'DM Sans', sans-serif; font-weight: 600; font-size: 14px;
+    cursor: pointer; transition: all .2s; display: inline-flex; align-items: center; gap: 6px;
+  }
+  .btn-primary { background: var(--accent); color: #000; }
+  .btn-primary:hover { background: #ffb73d; }
+  .btn-danger { background: var(--red); color: #fff; }
+  .btn-danger:hover { filter: brightness(1.15); }
+  .btn-ghost { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+  .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-sm { padding: 5px 10px; font-size: 12px; border-radius: 6px; }
+  .btn-green { background: var(--green); color: #000; }
+
+  /* MOTO LIST */
+  .moto-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 14px 16px;
+    margin-bottom: 10px; display: flex; flex-direction: column; gap: 10px;
+  }
+  .moto-header { display: flex; justify-content: space-between; align-items: flex-start; }
+  .moto-title { font-family: 'Bebas Neue', sans-serif; font-size: 20px; letter-spacing: 1px; }
+  .badge {
+    font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 20px;
+    text-transform: uppercase; letter-spacing: .5px;
+  }
+  .badge-available { background: rgba(62,207,142,.15); color: var(--green); border: 1px solid rgba(62,207,142,.3); }
+  .badge-sold { background: rgba(255,107,107,.15); color: var(--red); border: 1px solid rgba(255,107,107,.3); }
+  .moto-meta { display: flex; flex-wrap: wrap; gap: 12px; font-size: 13px; color: var(--muted); }
+  .moto-meta span { display: flex; align-items: center; gap: 4px; }
+  .moto-meta b { color: var(--text); }
+  .moto-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  /* EXPENSES */
+  .expense-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 0; border-bottom: 1px solid var(--border);
+    font-size: 14px;
+  }
+  .expense-row:last-child { border-bottom: none; }
+  .expense-desc { flex: 1; }
+  .expense-amount { font-family: 'JetBrains Mono', monospace; color: var(--red); font-weight: 600; }
+
+  /* SEARCH */
+  .search-box { position: relative; margin-bottom: 18px; }
+  .search-box input { padding-left: 38px; }
+  .search-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 16px; }
+
+  /* MODAL */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,.75); z-index: 200;
+    align-items: center; justify-content: center; padding: 16px;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 16px; width: 100%; max-width: 520px;
+    max-height: 90vh; overflow-y: auto;
+  }
+  .modal-header {
+    padding: 18px 20px; border-bottom: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .modal-title { font-family: 'Bebas Neue', sans-serif; font-size: 22px; letter-spacing: 1px; }
+  .modal-body { padding: 20px; }
+  .modal-footer { padding: 16px 20px; border-top: 1px solid var(--border); display: flex; gap: 10px; justify-content: flex-end; }
+  .close-btn { background: none; border: none; color: var(--muted); font-size: 22px; cursor: pointer; line-height: 1; }
+
+  /* TAG */
+  .tag { font-size: 11px; background: var(--surface2); border: 1px solid var(--border); padding: 2px 8px; border-radius: 20px; color: var(--muted); }
+
+  /* EMPTY STATE */
+  .empty { text-align: center; padding: 40px 20px; color: var(--muted); }
+  .empty-icon { font-size: 40px; margin-bottom: 10px; }
+
+  /* DETAIL VIEW */
+  .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media(max-width:400px){ .detail-grid { grid-template-columns: 1fr; } }
+  .detail-item { background: var(--surface2); border-radius: 8px; padding: 10px 12px; }
+  .detail-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .8px; margin-bottom: 3px; }
+  .detail-value { font-size: 14px; font-weight: 500; }
+
+  hr.divider { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
+
+  .profit { font-family: 'JetBrains Mono', monospace; font-size: 18px; font-weight: 600; }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="logo">🏍️ Moto<span>Desk</span></div>
+  <div class="nav-tabs">
+    <button class="nav-tab active" onclick="showPage('dashboard')">Dashboard</button>
+    <button class="nav-tab" onclick="showPage('inventory')">Inventory</button>
+    <button class="nav-tab" onclick="showPage('expenses')">Expenses</button>
+    <button class="nav-tab" onclick="showPage('search')">Search</button>
+  </div>
+</nav>
+
+<div class="sync-bar" id="sync-bar">
+  <span><span class="sync-dot grey" id="sync-dot"></span><span id="sync-status">Not signed in</span></span>
+  <span id="sync-actions">
+    <button class="btn btn-primary btn-sm" onclick="signIn()">Sign in with Google</button>
+  </span>
+</div>
+
+<!-- LOGIN SCREEN -->
+<div id="login-screen" class="login-screen">
+  <div class="login-icon">🏍️</div>
+  <div class="login-title">Welcome to MotoDesk</div>
+  <div class="login-sub">Sign in with Google to sync your inventory and data across all your devices via Google Sheets.</div>
+  <button class="btn btn-primary" style="font-size:15px; padding:14px 28px;" onclick="signIn()">
+    <svg width="18" height="18" viewBox="0 0 48 48" style="vertical-align:middle;margin-right:6px;"><path fill="#FFC107" d="M43.6 20H24v8h11.3C33.6 33.1 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3 0 5.8 1.1 7.9 3l5.7-5.7C34.1 6.5 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20c11 0 19.7-8 19.7-20 0-1.3-.1-2.7-.1-4z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.6 15.1 18.9 12 24 12c3 0 5.8 1.1 7.9 3l5.7-5.7C34.1 6.5 29.3 4 24 4 16.3 4 9.7 8.4 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-1.9 13.5-5l-6.2-5.2C29.5 35.6 26.9 36 24 36c-5.2 0-9.6-2.9-11.3-7.1l-6.5 5C9.5 39.5 16.3 44 24 44z"/><path fill="#1976D2" d="M43.6 20H24v8h11.3c-.8 2.3-2.3 4.2-4.3 5.5l6.2 5.2C41 35.3 44 30 44 24c0-1.3-.1-2.7-.4-4z"/></svg>
+    Sign in with Google
+  </button>
+  <div style="margin-top:16px; font-size:12px; color:var(--muted);">Your data is stored in your own Google Sheet — you own it completely.</div>
+</div>
+
+<div id="app-content" style="display:none;">
+<!-- DASHBOARD -->
+<div class="page active" id="page-dashboard">
+  <div style="margin-bottom:20px; margin-top:4px;">
+    <div style="font-family:'Bebas Neue',sans-serif; font-size:28px; letter-spacing:2px;">BUSINESS OVERVIEW</div>
+    <div style="color:var(--muted); font-size:13px;">Your motorcycle dealership at a glance</div>
+  </div>
+  <div class="stats-grid" id="stats-grid"></div>
+
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; margin-top:4px;">
+    <div class="section-title" style="margin:0;">📅 This Month's Sales</div>
+    <div id="month-label" style="font-size:12px; color:var(--muted);"></div>
+  </div>
+  <div class="stats-grid" id="month-stats" style="margin-bottom:20px;"></div>
+  <div id="month-sold-list"></div>
+</div>
+
+<!-- INVENTORY -->
+<div class="page" id="page-inventory">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; margin-top:4px;">
+    <div>
+      <div style="font-family:'Bebas Neue',sans-serif; font-size:28px; letter-spacing:2px;">INVENTORY</div>
+      <div style="color:var(--muted); font-size:13px;">All motorcycles</div>
+    </div>
+    <button class="btn btn-primary" onclick="openAddMoto()">+ Add Moto</button>
+  </div>
+
+  <div style="display:flex; gap:8px; margin-bottom:16px;">
+    <button class="btn btn-ghost btn-sm" onclick="filterInventory('all')" id="filter-all">All</button>
+    <button class="btn btn-ghost btn-sm" onclick="filterInventory('available')" id="filter-available">Available</button>
+    <button class="btn btn-ghost btn-sm" onclick="filterInventory('sold')" id="filter-sold">Sold</button>
+  </div>
+
+  <div id="inventory-list"></div>
+</div>
+
+<!-- EXPENSES -->
+<div class="page" id="page-expenses">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; margin-top:4px;">
+    <div>
+      <div style="font-family:'Bebas Neue',sans-serif; font-size:28px; letter-spacing:2px;">EXPENSES</div>
+      <div style="color:var(--muted); font-size:13px;">Repair & maintenance costs</div>
+    </div>
+    <button class="btn btn-primary" onclick="openAddExpense()">+ Add Expense</button>
+  </div>
+  <div id="expense-list"></div>
+</div>
+
+<!-- SEARCH -->
+<div class="page" id="page-search">
+  <div style="margin-bottom:20px; margin-top:4px;">
+    <div style="font-family:'Bebas Neue',sans-serif; font-size:28px; letter-spacing:2px;">SEARCH</div>
+    <div style="color:var(--muted); font-size:13px;">Find any motorcycle, buyer, or seller</div>
+  </div>
+  <div class="search-box">
+    <span class="search-icon">🔍</span>
+    <input type="text" id="search-input" placeholder="Search by make, model, reg no, chassis, buyer, seller…" oninput="doSearch()"/>
+  </div>
+  <div id="search-results"></div>
+</div>
+
+</div><!-- end app-content -->
+
+<!-- MODAL: Add/Edit Motorcycle -->
+<div class="modal-overlay" id="modal-moto">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-moto-title">ADD MOTORCYCLE</div>
+      <button class="close-btn" onclick="closeModal('modal-moto')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-grid form-grid-2">
+          <div class="field"><label>Make</label><input id="m-make" placeholder="Honda, Yamaha…"/></div>
+          <div class="field"><label>Model</label><input id="m-model" placeholder="CBR500, MT-07…"/></div>
+        </div>
+        <div class="form-grid form-grid-2">
+          <div class="field"><label>Year</label><input id="m-year" type="number" placeholder="2019"/></div>
+          <div class="field"><label>Registration Number</label><input id="m-plate" placeholder="MH 12 AB 1234"/></div>
+        </div>
+        <div class="field"><label>Chassis Number</label><input id="m-chassis" placeholder="e.g. ME4KC09LXKA123456"/></div>
+        <div class="form-grid form-grid-2">
+          <div class="field"><label>Color</label><input id="m-color" placeholder="Black, Red…"/></div>
+          <div class="field"><label>Mileage (km)</label><input id="m-mileage" type="number" placeholder="15000"/></div>
+        </div>
+        <div class="form-grid form-grid-2">
+          <div class="field"><label>Purchase Price (₹)</label><input id="m-buy-price" type="number" placeholder="0"/></div>
+          <div class="field"><label>Asking / Sell Price (₹)</label><input id="m-sell-price" type="number" placeholder="0"/></div>
+        </div>
+        <div class="field"><label>Notes</label><textarea id="m-notes" placeholder="Condition, modifications…"></textarea></div>
+
+        <hr class="divider"/>
+        <div style="font-family:'Bebas Neue',sans-serif; font-size:16px; color:var(--accent); letter-spacing:1px;">SELLER DETAILS</div>
+        <div class="form-grid form-grid-2">
+          <div class="field"><label>Seller Name</label><input id="m-seller-name" placeholder="Full name"/></div>
+          <div class="field"><label>Seller Phone</label><input id="m-seller-phone" placeholder="+1 555 000"/></div>
+        </div>
+        <div class="field"><label>Seller Address</label><input id="m-seller-address" placeholder="Street, City…"/></div>
+
+        <hr class="divider"/>
+        <div style="font-family:'Bebas Neue',sans-serif; font-size:16px; color:var(--blue); letter-spacing:1px;">BUYER DETAILS <span style="font-size:12px; color:var(--muted); font-family:'DM Sans',sans-serif;">(fill when sold)</span></div>
+        <div class="form-grid form-grid-2">
+          <div class="field"><label>Buyer Name</label><input id="m-buyer-name" placeholder="Full name"/></div>
+          <div class="field"><label>Buyer Phone</label><input id="m-buyer-phone" placeholder="+1 555 000"/></div>
+        </div>
+        <div class="field"><label>Buyer Address</label><input id="m-buyer-address" placeholder="Street, City…"/></div>
+        <div class="form-grid form-grid-2">
+          <div class="field"><label>Sale Date</label><input id="m-sale-date" type="date"/></div>
+          <div class="field"><label>Status</label>
+            <select id="m-status">
+              <option value="available">Available</option>
+              <option value="sold">Sold</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-moto')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveMoto()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Add Expense -->
+<div class="modal-overlay" id="modal-expense">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">ADD EXPENSE</div>
+      <button class="close-btn" onclick="closeModal('modal-expense')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="field"><label>Motorcycle</label>
+          <select id="e-moto-id"><option value="">— General / Unlinked —</option></select>
+        </div>
+        <div class="field"><label>Description</label><input id="e-desc" placeholder="Oil change, new tires…"/></div>
+        <div class="form-grid form-grid-2">
+          <div class="field"><label>Amount (₹)</label><input id="e-amount" type="number" placeholder="0"/></div>
+          <div class="field"><label>Date</label><input id="e-date" type="date"/></div>
+        </div>
+        <div class="field"><label>Category</label>
+          <select id="e-category">
+            <option>Engine</option><option>Brakes</option><option>Tires</option>
+            <option>Electrical</option><option>Body / Paint</option>
+            <option>Fluids</option><option>Parts</option><option>Labor</option><option>Other</option>
+          </select>
+        </div>
+        <div class="field"><label>Notes</label><textarea id="e-notes" placeholder="Additional details…"></textarea></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-expense')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveExpense()">Save Expense</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Moto Detail -->
+<div class="modal-overlay" id="modal-detail">
+  <div class="modal" style="max-width:580px;">
+    <div class="modal-header">
+      <div class="modal-title" id="detail-title">MOTORCYCLE DETAIL</div>
+      <button class="close-btn" onclick="closeModal('modal-detail')">✕</button>
+    </div>
+    <div class="modal-body" id="detail-body"></div>
+    <div class="modal-footer" id="detail-footer"></div>
+  </div>
+</div>
+
+<script>
+// ─── CONFIG ───────────────────────────────────────────────────────────────────
+const CLIENT_ID = '330922450601-odfc4jgfn7366a2u17nh3vhg37be1s3d.apps.googleusercontent.com';
+const SCOPES = 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.file';
+const SHEET_NAME_MOTOS = 'Motos';
+const SHEET_NAME_EXP   = 'Expenses';
+
+// ─── STATE ────────────────────────────────────────────────────────────────────
+let accessToken   = null;
+let sheetId       = localStorage.getItem('sheetId') || null;
+let motos         = [];
+let expenses      = [];
+let editMotoId    = null;
+let isSyncing     = false;
+
+// ─── LOCAL CACHE ──────────────────────────────────────────────────────────────
+const DB = {
+  load(key, def=[]) { try { return JSON.parse(localStorage.getItem(key)) || def; } catch { return def; } },
+  save(key, data)   { localStorage.setItem(key, JSON.stringify(data)); }
+};
+
+// ─── GOOGLE AUTH ──────────────────────────────────────────────────────────────
+function waitForGoogle(cb, tries=0) {
+  if(typeof google !== 'undefined' && google.accounts) { cb(); return; }
+  if(tries > 30) { alert('Google sign-in failed to load. Please check your internet connection and reload the page.'); return; }
+  setTimeout(() => waitForGoogle(cb, tries+1), 300);
+}
+
+function signIn() {
+  setSyncStatus('orange', 'Button tapped — loading…');
+  alert('Sign in button tapped! Waiting for Google…');
+  waitForGoogle(() => {
+    alert('Google loaded! Opening sign-in popup…');
+    try {
+      const client = google.accounts.oauth2.initTokenClient({
+        client_id: CLIENT_ID,
+        scope: SCOPES,
+        callback: async (resp) => {
+          if(resp.error) {
+            setSyncStatus('red', 'Sign in failed: ' + (resp.error_description || resp.error));
+            alert('Sign in failed: ' + (resp.error_description || resp.error));
+            return;
+          }
+          accessToken = resp.access_token;
+          localStorage.setItem('accessToken', accessToken);
+          setSyncStatus('orange', 'Signed in, loading data…');
+          showApp();
+          await initSheet();
+          await loadFromSheet();
+        }
+      });
+      client.requestAccessToken();
+    } catch(e) {
+      setSyncStatus('red', 'Error: ' + e.message);
+      alert('Sign in error: ' + e.message);
+    }
+  });
+}
+
+function signOut() {
+  accessToken = null;
+  localStorage.removeItem('accessToken');
+  localStorage.removeItem('sheetId');
+  sheetId = null;
+  setSyncStatus('grey', 'Not signed in');
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('app-content').style.display  = 'none';
+  document.getElementById('sync-actions').innerHTML = '<button class="btn btn-primary btn-sm" onclick="signIn()">Sign in with Google</button>';
+}
+
+function showApp() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app-content').style.display  = 'block';
+  document.getElementById('sync-actions').innerHTML = `
+    <span style="color:var(--muted);font-size:11px;" id="user-email"></span>
+    <button class="btn btn-ghost btn-sm" onclick="loadFromSheet()" style="margin-left:6px;">↻ Sync</button>
+    <button class="btn btn-ghost btn-sm" onclick="signOut()" style="margin-left:4px;">Sign out</button>`;
+}
+
+// ─── SHEET INIT ───────────────────────────────────────────────────────────────
+async function initSheet() {
+  if(sheetId) { await ensureSheetTabs(); return; }
+  // Create new spreadsheet
+  setSyncStatus('orange', 'Creating MotoDesk sheet…');
+  const res = await gapi('https://sheets.googleapis.com/v4/spreadsheets', 'POST', {
+    properties: { title: 'MotoDesk Data' },
+    sheets: [
+      { properties: { title: SHEET_NAME_MOTOS } },
+      { properties: { title: SHEET_NAME_EXP   } }
+    ]
+  });
+  sheetId = res.spreadsheetId;
+  localStorage.setItem('sheetId', sheetId);
+  // Write headers
+  await writeHeaders();
+  setSyncStatus('green', 'Sheet created!');
+}
+
+async function ensureSheetTabs() {
+  try {
+    const res = await gapi(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}`, 'GET');
+    const titles = res.sheets.map(s=>s.properties.title);
+    const toAdd = [];
+    if(!titles.includes(SHEET_NAME_MOTOS)) toAdd.push({addSheet:{properties:{title:SHEET_NAME_MOTOS}}});
+    if(!titles.includes(SHEET_NAME_EXP))   toAdd.push({addSheet:{properties:{title:SHEET_NAME_EXP}}});
+    if(toAdd.length) {
+      await gapi(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}:batchUpdate`,'POST',{requests:toAdd});
+      await writeHeaders();
+    }
+  } catch(e) { sheetId=null; localStorage.removeItem('sheetId'); await initSheet(); }
+}
+
+const MOTO_HEADERS = ['id','make','model','year','plate','chassis','color','mileage','buyPrice','sellPrice','notes','sellerName','sellerPhone','sellerAddress','buyerName','buyerPhone','buyerAddress','saleDate','status','createdAt'];
+const EXP_HEADERS  = ['id','motoId','desc','amount','date','category','notes','createdAt'];
+
+async function writeHeaders() {
+  await sheetUpdate(`${SHEET_NAME_MOTOS}!A1`, [MOTO_HEADERS]);
+  await sheetUpdate(`${SHEET_NAME_EXP}!A1`,  [EXP_HEADERS]);
+}
+
+// ─── SHEET READ/WRITE ─────────────────────────────────────────────────────────
+async function loadFromSheet() {
+  setSyncStatus('orange', 'Syncing…');
+  isSyncing = true;
+  try {
+    const [motoRows, expRows] = await Promise.all([
+      sheetRead(`${SHEET_NAME_MOTOS}!A1:T5000`),
+      sheetRead(`${SHEET_NAME_EXP}!A1:H5000`)
+    ]);
+    motos    = rowsToObjects(motoRows, MOTO_HEADERS);
+    expenses = rowsToObjects(expRows,  EXP_HEADERS);
+    DB.save('motos', motos);
+    DB.save('expenses', expenses);
+    setSyncStatus('green', `Synced — ${motos.length} bikes, ${expenses.length} expenses`);
+    renderDashboard();
+    renderInventory(currentFilter);
+    renderExpenses();
+  } catch(e) {
+    setSyncStatus('red', 'Sync failed — using local data');
+    motos    = DB.load('motos');
+    expenses = DB.load('expenses');
+    renderDashboard();
+  }
+  isSyncing = false;
+}
+
+async function saveToSheet() {
+  if(!accessToken || !sheetId) { DB.save('motos',motos); DB.save('expenses',expenses); return; }
+  setSyncStatus('orange', 'Saving…');
+  try {
+    const motoRows = [MOTO_HEADERS, ...motos.map(m=>MOTO_HEADERS.map(k=>m[k]??''))];
+    const expRows  = [EXP_HEADERS,  ...expenses.map(e=>EXP_HEADERS.map(k=>e[k]??''))];
+    await sheetClear(SHEET_NAME_MOTOS);
+    await sheetClear(SHEET_NAME_EXP);
+    await sheetUpdate(`${SHEET_NAME_MOTOS}!A1`, motoRows);
+    await sheetUpdate(`${SHEET_NAME_EXP}!A1`,  expRows);
+    DB.save('motos', motos);
+    DB.save('expenses', expenses);
+    setSyncStatus('green', 'Saved to Google Sheets ✓');
+  } catch(e) {
+    setSyncStatus('red', 'Save failed — stored locally');
+    DB.save('motos', motos);
+    DB.save('expenses', expenses);
+  }
+}
+
+// ─── SHEET HELPERS ────────────────────────────────────────────────────────────
+async function sheetRead(range) {
+  const res = await gapi(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent(range)}`, 'GET');
+  return res.values || [];
+}
+async function sheetUpdate(range, values) {
+  await gapi(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent(range)}?valueInputOption=RAW`, 'PUT', { values });
+}
+async function sheetClear(tab) {
+  await gapi(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent(tab)}:clear`, 'POST', {});
+}
+function rowsToObjects(rows, headers) {
+  if(rows.length < 2) return [];
+  return rows.slice(1).map(row => {
+    const obj = {};
+    headers.forEach((h,i) => obj[h] = row[i] ?? '');
+    return obj;
+  }).filter(o=>o.id);
+}
+async function gapi(url, method, body) {
+  const opts = { method, headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' } };
+  if(body) opts.body = JSON.stringify(body);
+  const res = await fetch(url, opts);
+  if(!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+// ─── SYNC STATUS UI ───────────────────────────────────────────────────────────
+function setSyncStatus(color, msg) {
+  const dot = document.getElementById('sync-dot');
+  const txt = document.getElementById('sync-status');
+  if(dot) { dot.className = `sync-dot ${color}`; }
+  if(txt) txt.textContent = msg;
+}
+
+// seed sample data if empty
+if (!motos.length) {
+  motos = [
+    { id: uid(), make:'Honda', model:'CB500F', year:2018, plate:'MH 12 XY 9010', chassis:'ME4JC921XKA100123', color:'Black', mileage:22000,
+      buyPrice:52000, sellPrice:68000, notes:'Minor scratches on tank',
+      sellerName:'James Ford', sellerPhone:'555-1001', sellerAddress:'12 Oak St, Denver',
+      buyerName:'Maria Lopez', buyerPhone:'555-2002', buyerAddress:'99 Maple Ave, Denver',
+      saleDate:'2024-03-10', status:'sold', createdAt: Date.now()-86400000*10 },
+    { id: uid(), make:'Yamaha', model:'MT-07', year:2020, plate:'KA 05 AB 4550', chassis:'ME1RG0503L0023456', color:'Blue', mileage:9800,
+      buyPrice:85000, sellPrice:110000, notes:'Excellent condition, new chain',
+      sellerName:'Tony Green', sellerPhone:'555-3003', sellerAddress:'7 Pine Rd, Boulder',
+      buyerName:'', buyerPhone:'', buyerAddress:'',
+      saleDate:'', status:'available', createdAt: Date.now()-86400000*3 },
+    { id: uid(), make:'Kawasaki', model:'Z650', year:2019, plate:'DL 8C AZ 2120', chassis:'JKAZR0A16KA012345', color:'Green', mileage:14300,
+      buyPrice:62000, sellPrice:82000, notes:'Needs new brake pads',
+      sellerName:'Sarah Kim', sellerPhone:'555-4004', sellerAddress:'3 Birch Lane, Aurora',
+      buyerName:'', buyerPhone:'', buyerAddress:'',
+      saleDate:'', status:'available', createdAt: Date.now()-86400000 }
+  ];
+  DB.save('motos', motos);
+}
+if (!expenses.length) {
+  expenses = [
+    { id: uid(), motoId: motos[0].id, desc:'Full service + oil change', amount:2500, date:'2024-02-20', category:'Engine', notes:'', createdAt:Date.now()-86400000*15 },
+    { id: uid(), motoId: motos[1].id, desc:'New rear tyre', amount:3800, date:'2024-03-01', category:'Tires', notes:'Pirelli Angel GT', createdAt:Date.now()-86400000*5 },
+    { id: uid(), motoId: motos[2].id, desc:'Brake pads front+rear', amount:1200, date:'2024-03-08', category:'Brakes', notes:'', createdAt:Date.now()-86400000*2 }
+  ];
+  DB.save('expenses', expenses);
+}
+
+function uid() { return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+
+// ─── NAVIGATION ───────────────────────────────────────────────────────────────
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  document.querySelectorAll('.nav-tab').forEach(t=>{ if(t.textContent.toLowerCase().includes(id.slice(0,4))) t.classList.add('active'); });
+  if(id==='dashboard') renderDashboard();
+  if(id==='inventory') renderInventory('all');
+  if(id==='expenses') renderExpenses();
+  if(id==='search') { document.getElementById('search-input').value=''; renderSearch([]); }
+}
+
+// ─── DASHBOARD ────────────────────────────────────────────────────────────────
+function renderDashboard() {
+  const totalExp   = expenses.reduce((s,e)=>s+Number(e.amount),0);
+  const available  = motos.filter(m=>m.status==='available').length;
+  const sold       = motos.filter(m=>m.status==='sold').length;
+  const soldMotos  = motos.filter(m=>m.status==='sold');
+  const revenue    = soldMotos.reduce((s,m)=>s+Number(m.sellPrice||0),0);
+  const cogs       = soldMotos.reduce((s,m)=>s+Number(m.buyPrice||0),0);
+  const expOfSold  = expenses.filter(e=>soldMotos.find(m=>m.id===e.motoId)).reduce((s,e)=>s+Number(e.amount),0);
+  const profit     = revenue - cogs - expOfSold;
+
+  document.getElementById('stats-grid').innerHTML = `
+    <div class="stat-card"><div class="stat-label">Available</div><div class="stat-value orange">${available}</div></div>
+    <div class="stat-card"><div class="stat-label">Sold</div><div class="stat-value blue">${sold}</div></div>
+    <div class="stat-card"><div class="stat-label">Total Expenses</div><div class="stat-value red">₹${fmt(totalExp)}</div></div>
+    <div class="stat-card"><div class="stat-label">Net Profit</div><div class="stat-value ${profit>=0?'green':'red'}">₹${fmt(profit)}</div></div>
+  `;
+
+}
+
+// ─── INVENTORY ────────────────────────────────────────────────────────────────
+let currentFilter = 'all';
+function filterInventory(f) {
+  currentFilter = f;
+  ['all','available','sold'].forEach(x=>{
+    document.getElementById('filter-'+x).classList.toggle('btn-primary', x===f);
+  });
+  renderInventory(f);
+}
+function renderInventory(filter) {
+  const list = filter==='all' ? motos : motos.filter(m=>m.status===filter);
+  const el = document.getElementById('inventory-list');
+  if(!list.length) { el.innerHTML='<div class="empty"><div class="empty-icon">🏍️</div>No motorcycles found</div>'; return; }
+  el.innerHTML = [...list].sort((a,b)=>b.createdAt-a.createdAt).map(m=>{
+    const exp = expenses.filter(e=>e.motoId===m.id).reduce((s,e)=>s+Number(e.amount),0);
+    return `
+    <div class="moto-card">
+      <div class="moto-header">
+        <div>
+          <div class="moto-title">${m.year} ${m.make} ${m.model}</div>
+          <div style="font-size:12px; color:var(--muted); margin-top:2px;">${m.plate||''} ${m.color?'· '+m.color:''}</div>
+        </div>
+        <span class="badge badge-${m.status}">${m.status}</span>
+      </div>
+      <div class="moto-meta">
+        <span>🛣️ <b>${Number(m.mileage||0).toLocaleString()} km</b></span>
+        <span>💰 Bought: <b>₹${fmt(m.buyPrice)}</b></span>
+        <span>🏷️ Price: <b>₹${fmt(m.sellPrice)}</b></span>
+        <span>🔧 Expenses: <b style="color:var(--red)">₹${fmt(exp)}</b></span>
+      </div>
+      <div class="moto-actions">
+        <button class="btn btn-ghost btn-sm" onclick="openDetail('${m.id}')">View</button>
+        <button class="btn btn-ghost btn-sm" onclick="openEditMoto('${m.id}')">Edit</button>
+        <button class="btn btn-ghost btn-sm" onclick="openAddExpenseFor('${m.id}')">+ Expense</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteMoto('${m.id}')">Delete</button>
+      </div>
+    </div>`}).join('');
+}
+
+// ─── EXPENSES ─────────────────────────────────────────────────────────────────
+function renderExpenses() {
+  const el = document.getElementById('expense-list');
+  if(!expenses.length) { el.innerHTML='<div class="empty"><div class="empty-icon">🔧</div>No expenses yet</div>'; return; }
+  const grouped = {};
+  [...expenses].sort((a,b)=>new Date(b.date)-new Date(a.date)).forEach(e=>{
+    const moto = motos.find(m=>m.id===e.motoId);
+    const key  = moto ? `${moto.year} ${moto.make} ${moto.model}` : 'General';
+    if(!grouped[key]) grouped[key]=[];
+    grouped[key].push(e);
+  });
+
+  el.innerHTML = Object.entries(grouped).map(([key,exps])=>{
+    const total = exps.reduce((s,e)=>s+Number(e.amount),0);
+    return `<div class="card" style="margin-bottom:14px;">
+      <div class="card-header">
+        <span style="font-weight:600;">${key}</span>
+        <span class="expense-amount">-₹${fmt(total)}</span>
+      </div>
+      <div class="card-body" style="padding:0 16px;">
+        ${exps.map(e=>`
+        <div class="expense-row">
+          <div class="expense-desc">
+            <div style="font-weight:500;">${e.desc}</div>
+            <div style="font-size:12px; color:var(--muted);">${e.date} · <span class="tag">${e.category}</span></div>
+          </div>
+          <div style="display:flex; align-items:center; gap:10px;">
+            <span class="expense-amount">-₹${fmt(e.amount)}</span>
+            <button class="btn btn-danger btn-sm" onclick="deleteExpense('${e.id}')">✕</button>
+          </div>
+        </div>`).join('')}
+      </div>
+    </div>`}).join('');
+}
+
+// ─── SEARCH ───────────────────────────────────────────────────────────────────
+function doSearch() {
+  const q = document.getElementById('search-input').value.toLowerCase().trim();
+  if(!q) { renderSearch([]); return; }
+  const results = motos.filter(m=>
+    [m.make,m.model,m.year,m.plate,m.chassis,m.color,m.sellerName,m.sellerPhone,m.buyerName,m.buyerPhone,m.notes]
+    .some(v=>String(v||'').toLowerCase().includes(q))
+  );
+  renderSearch(results);
+}
+function renderSearch(results) {
+  const el = document.getElementById('search-results');
+  if(!results.length) {
+    const q = document.getElementById('search-input').value;
+    el.innerHTML = q ? '<div class="empty"><div class="empty-icon">🔍</div>No results found</div>' : '';
+    return;
+  }
+  el.innerHTML = results.map(m=>{
+    const exp = expenses.filter(e=>e.motoId===m.id).reduce((s,e)=>s+Number(e.amount),0);
+    return `<div class="moto-card" style="cursor:pointer;" onclick="openDetail('${m.id}')">
+      <div class="moto-header">
+        <div class="moto-title">${m.year} ${m.make} ${m.model}</div>
+        <span class="badge badge-${m.status}">${m.status}</span>
+      </div>
+      <div class="moto-meta">
+        <span>🔖 <b>${m.plate||'—'}</b></span>
+        ${m.chassis?`<span>🔩 <b>${m.chassis}</b></span>`:''}
+        ${m.sellerName?`<span>👤 Seller: <b>${m.sellerName}</b></span>`:''}
+        ${m.buyerName?`<span>🛒 Buyer: <b>${m.buyerName}</b></span>`:''}
+        <span>🔧 Exp: <b>₹${fmt(exp)}</b></span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ─── MODALS ───────────────────────────────────────────────────────────────────
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+function openAddMoto() {
+  editMotoId = null;
+  document.getElementById('modal-moto-title').textContent = 'ADD MOTORCYCLE';
+  ['make','model','year','plate','chassis','color','mileage','buy-price','sell-price','notes',
+   'seller-name','seller-phone','seller-address',
+   'buyer-name','buyer-phone','buyer-address','sale-date'].forEach(f=>{
+    document.getElementById('m-'+f).value='';
+  });
+  document.getElementById('m-status').value='available';
+  openModal('modal-moto');
+}
+
+function openEditMoto(id) {
+  editMotoId = id;
+  const m = motos.find(x=>x.id===id);
+  if(!m) return;
+  document.getElementById('modal-moto-title').textContent = 'EDIT MOTORCYCLE';
+  document.getElementById('m-make').value=m.make||'';
+  document.getElementById('m-model').value=m.model||'';
+  document.getElementById('m-year').value=m.year||'';
+  document.getElementById('m-plate').value=m.plate||'';
+  document.getElementById('m-chassis').value=m.chassis||'';
+  document.getElementById('m-color').value=m.color||'';
+  document.getElementById('m-mileage').value=m.mileage||'';
+  document.getElementById('m-buy-price').value=m.buyPrice||'';
+  document.getElementById('m-sell-price').value=m.sellPrice||'';
+  document.getElementById('m-notes').value=m.notes||'';
+  document.getElementById('m-seller-name').value=m.sellerName||'';
+  document.getElementById('m-seller-phone').value=m.sellerPhone||'';
+  document.getElementById('m-seller-address').value=m.sellerAddress||'';
+  document.getElementById('m-buyer-name').value=m.buyerName||'';
+  document.getElementById('m-buyer-phone').value=m.buyerPhone||'';
+  document.getElementById('m-buyer-address').value=m.buyerAddress||'';
+  document.getElementById('m-sale-date').value=m.saleDate||'';
+  document.getElementById('m-status').value=m.status||'available';
+  openModal('modal-moto');
+}
+
+async function saveMoto() {
+  const m = {
+    id: editMotoId || uid(),
+    make: v('m-make'), model: v('m-model'), year: v('m-year'), plate: v('m-plate'), chassis: v('m-chassis'),
+    color: v('m-color'), mileage: v('m-mileage'), buyPrice: v('m-buy-price'),
+    sellPrice: v('m-sell-price'), notes: v('m-notes'),
+    sellerName: v('m-seller-name'), sellerPhone: v('m-seller-phone'), sellerAddress: v('m-seller-address'),
+    buyerName: v('m-buyer-name'), buyerPhone: v('m-buyer-phone'), buyerAddress: v('m-buyer-address'),
+    saleDate: v('m-sale-date'), status: v('m-status'),
+    createdAt: editMotoId ? (motos.find(x=>x.id===editMotoId)||{}).createdAt||Date.now() : Date.now()
+  };
+  if(!m.make || !m.model) { alert('Make and Model are required.'); return; }
+  if(editMotoId) { motos = motos.map(x=>x.id===editMotoId?m:x); }
+  else { motos.unshift(m); }
+  await saveToSheet();
+  closeModal('modal-moto');
+  renderInventory(currentFilter);
+}
+
+async function deleteMoto(id) {
+  if(!confirm('Delete this motorcycle? All linked expenses will also be removed.')) return;
+  motos = motos.filter(m=>m.id!==id);
+  expenses = expenses.filter(e=>e.motoId!==id);
+  await saveToSheet();
+  renderInventory(currentFilter);
+}
+
+function openAddExpense() {
+  populateExpenseMotoSelect();
+  document.getElementById('e-moto-id').value='';
+  document.getElementById('e-desc').value='';
+  document.getElementById('e-amount').value='';
+  document.getElementById('e-date').value=today();
+  document.getElementById('e-notes').value='';
+  openModal('modal-expense');
+}
+function openAddExpenseFor(motoId) {
+  openAddExpense();
+  document.getElementById('e-moto-id').value=motoId;
+}
+function populateExpenseMotoSelect() {
+  const sel = document.getElementById('e-moto-id');
+  sel.innerHTML='<option value="">— General / Unlinked —</option>';
+  motos.forEach(m=>{ const o=document.createElement('option'); o.value=m.id; o.textContent=`${m.year} ${m.make} ${m.model} (${m.plate||'no reg'})`; sel.appendChild(o); });
+}
+async function saveExpense() {
+  const e = { id:uid(), motoId:v('e-moto-id'), desc:v('e-desc'), amount:Number(v('e-amount')),
+               date:v('e-date'), category:v('e-category'), notes:v('e-notes'), createdAt:Date.now() };
+  if(!e.desc || !e.amount) { alert('Description and amount required.'); return; }
+  expenses.unshift(e);
+  await saveToSheet();
+  closeModal('modal-expense');
+  renderExpenses();
+}
+async function deleteExpense(id) {
+  if(!confirm('Remove this expense?')) return;
+  expenses = expenses.filter(e=>e.id!==id);
+  await saveToSheet();
+  renderExpenses();
+}
+
+// ─── DETAIL MODAL ─────────────────────────────────────────────────────────────
+function openDetail(id) {
+  const m = motos.find(x=>x.id===id);
+  if(!m) return;
+  const exp = expenses.filter(e=>e.motoId===m.id);
+  const totalExp = exp.reduce((s,e)=>s+Number(e.amount),0);
+  const profit = Number(m.sellPrice||0) - Number(m.buyPrice||0) - totalExp;
+
+  document.getElementById('detail-title').textContent = `${m.year} ${m.make} ${m.model}`;
+  document.getElementById('detail-body').innerHTML = `
+    <div style="margin-bottom:12px; display:flex; gap:8px; align-items:center;">
+      <span class="badge badge-${m.status}">${m.status}</span>
+      ${m.plate?`<span class="tag">🔖 ${m.plate}</span>`:''}
+      ${m.chassis?`<span class="tag">🔩 ${m.chassis}</span>`:''}
+      ${m.color?`<span class="tag">${m.color}</span>`:''}
+    </div>
+    <div class="detail-grid" style="margin-bottom:16px;">
+      <div class="detail-item"><div class="detail-label">Reg. Number</div><div class="detail-value">${m.plate||'—'}</div></div>
+      <div class="detail-item"><div class="detail-label">Chassis No.</div><div class="detail-value">${m.chassis||'—'}</div></div>
+      <div class="detail-item"><div class="detail-label">Mileage</div><div class="detail-value">${Number(m.mileage||0).toLocaleString()} km</div></div>
+      <div class="detail-item"><div class="detail-label">Purchase Price</div><div class="detail-value">₹${fmt(m.buyPrice)}</div></div>
+      <div class="detail-item"><div class="detail-label">Sell Price</div><div class="detail-value">₹${fmt(m.sellPrice)}</div></div>
+      <div class="detail-item"><div class="detail-label">Repair Expenses</div><div class="detail-value" style="color:var(--red)">-₹${fmt(totalExp)}</div></div>
+    </div>
+    ${m.notes?`<div style="font-size:13px; color:var(--muted); margin-bottom:14px;">📝 ${m.notes}</div>`:''}
+    <div style="display:flex; align-items:center; gap:10px; padding:12px; background:var(--surface2); border-radius:8px; margin-bottom:16px;">
+      <span style="font-size:13px; color:var(--muted);">Net Profit:</span>
+      <span class="profit" style="color:${profit>=0?'var(--green)':'var(--red)'};">${profit>=0?'+':''} ₹${fmt(profit)}</span>
+    </div>
+    <hr class="divider"/>
+    <div style="font-family:'Bebas Neue',sans-serif; font-size:15px; color:var(--accent); letter-spacing:1px; margin-bottom:10px;">SELLER</div>
+    ${m.sellerName||m.sellerPhone?`
+    <div class="detail-grid" style="margin-bottom:16px;">
+      ${m.sellerName?`<div class="detail-item"><div class="detail-label">Name</div><div class="detail-value">${m.sellerName}</div></div>`:''}
+      ${m.sellerPhone?`<div class="detail-item"><div class="detail-label">Phone</div><div class="detail-value">${m.sellerPhone}</div></div>`:''}
+      ${m.sellerAddress?`<div class="detail-item" style="grid-column:1/-1;"><div class="detail-label">Address</div><div class="detail-value">${m.sellerAddress}</div></div>`:''}
+    </div>`:'<div style="color:var(--muted); font-size:13px; margin-bottom:14px;">No seller info</div>'}
+    <hr class="divider"/>
+    <div style="font-family:'Bebas Neue',sans-serif; font-size:15px; color:var(--blue); letter-spacing:1px; margin-bottom:10px;">BUYER</div>
+    ${m.buyerName||m.buyerPhone?`
+    <div class="detail-grid" style="margin-bottom:16px;">
+      ${m.buyerName?`<div class="detail-item"><div class="detail-label">Name</div><div class="detail-value">${m.buyerName}</div></div>`:''}
+      ${m.buyerPhone?`<div class="detail-item"><div class="detail-label">Phone</div><div class="detail-value">${m.buyerPhone}</div></div>`:''}
+      ${m.saleDate?`<div class="detail-item"><div class="detail-label">Sale Date</div><div class="detail-value">${m.saleDate}</div></div>`:''}
+      ${m.buyerAddress?`<div class="detail-item" style="grid-column:1/-1;"><div class="detail-label">Address</div><div class="detail-value">${m.buyerAddress}</div></div>`:''}
+    </div>`:'<div style="color:var(--muted); font-size:13px; margin-bottom:14px;">Not sold yet</div>'}
+    ${exp.length?`
+    <hr class="divider"/>
+    <div style="font-family:'Bebas Neue',sans-serif; font-size:15px; color:var(--accent); letter-spacing:1px; margin-bottom:10px;">REPAIR EXPENSES</div>
+    ${exp.map(e=>`<div class="expense-row"><div class="expense-desc"><div style="font-weight:500;">${e.desc}</div><div style="font-size:12px; color:var(--muted);">${e.date} · <span class="tag">${e.category}</span></div></div><span class="expense-amount">-₹${fmt(e.amount)}</span></div>`).join('')}`:''}
+  `;
+  document.getElementById('detail-footer').innerHTML = `
+    <button class="btn btn-ghost" onclick="closeModal('modal-detail')">Close</button>
+    ${m.status==='sold' ? `<button class="btn btn-ghost" style="border-color:var(--red);color:var(--red);" onclick="returnVehicle('${m.id}')">↩ Mark Returned</button>` : ''}
+    <button class="btn btn-primary" onclick="closeModal('modal-detail'); openEditMoto('${m.id}')">Edit</button>
+  `;
+  openModal('modal-detail');
+}
+
+// ─── RETURN VEHICLE ───────────────────────────────────────────────────────────
+function returnVehicle(id) {
+  if(!confirm('Mark this vehicle as returned? It will be set back to Available and buyer details will be cleared.')) return;
+  motos = motos.map(m=>{
+    if(m.id!==id) return m;
+    return {...m, status:'available', buyerName:'', buyerPhone:'', buyerAddress:'', saleDate:''};
+  });
+  await saveToSheet();
+  closeModal('modal-detail');
+  renderDashboard();
+  renderInventory(currentFilter);
+}
+
+// ─── HELPERS ──────────────────────────────────────────────────────────────────
+function v(id) { return document.getElementById(id).value.trim(); }
+function fmt(n) { return Number(n||0).toLocaleString('en-IN',{minimumFractionDigits:0,maximumFractionDigits:0}); }
+function today() { return new Date().toISOString().slice(0,10); }
+
+// close modal on overlay click
+document.querySelectorAll('.modal-overlay').forEach(o=>{
+  o.addEventListener('click', e=>{ if(e.target===o) o.classList.remove('open'); });
+});
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+async function init() {
+  motos    = DB.load('motos');
+  expenses = DB.load('expenses');
+
+  const storedToken = localStorage.getItem('accessToken');
+  if(storedToken) {
+    accessToken = storedToken;
+    showApp();
+    setSyncStatus('orange', 'Restoring session…');
+    renderDashboard();
+    // Re-request token silently
+    waitForGoogle(() => {
+      try {
+        const client = google.accounts.oauth2.initTokenClient({
+          client_id: CLIENT_ID,
+          scope: SCOPES,
+          prompt: '',
+          callback: async (resp) => {
+            if(resp.error) { setSyncStatus('grey','Session expired — please sign in again'); return; }
+            accessToken = resp.access_token;
+            localStorage.setItem('accessToken', accessToken);
+            await initSheet();
+            await loadFromSheet();
+          }
+        });
+        client.requestAccessToken({prompt:''});
+      } catch(e) {
+        renderDashboard();
+        setSyncStatus('grey','Sign in to sync');
+      }
+    });
+  } else {
+    document.getElementById('login-screen').style.display = 'flex';
+    document.getElementById('app-content').style.display  = 'none';
+  }
+}
+
+init();
+</script>
+</body>
+</html>
+
