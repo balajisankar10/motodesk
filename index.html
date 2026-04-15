@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>MotoDesk — Business Manager</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet"/>
-<script src="https://accounts.google.com/gsi/client"></script>
 <style>
   :root {
     --bg: #0f0f0f;
@@ -32,13 +31,7 @@
   .sync-dot.red { background:var(--red); }
   .sync-dot.grey { background:var(--muted); }
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
-  .login-screen {
-    display:flex; flex-direction:column; align-items:center; justify-content:center;
-    min-height:80vh; text-align:center; padding:32px;
-  }
-  .login-icon { font-size:64px; margin-bottom:16px; }
-  .login-title { font-family:'Bebas Neue',sans-serif; font-size:36px; letter-spacing:2px; color:var(--accent); margin-bottom:8px; }
-  .login-sub { color:var(--muted); font-size:14px; margin-bottom:32px; max-width:300px; line-height:1.6; }
+
   body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; min-height: 100vh; }
 
   /* NAV */
@@ -219,25 +212,13 @@
 </nav>
 
 <div class="sync-bar" id="sync-bar">
-  <span><span class="sync-dot grey" id="sync-dot"></span><span id="sync-status">Not signed in</span></span>
-  <span id="sync-actions">
-    <button class="btn btn-primary btn-sm" onclick="signIn()">Sign in with Google</button>
+  <span><span class="sync-dot grey" id="sync-dot"></span><span id="sync-status">Loading…</span></span>
+  <span>
+    <button class="btn btn-ghost btn-sm" onclick="loadFromSheet()">↻ Sync</button>
   </span>
 </div>
 
 <!-- LOGIN SCREEN -->
-<div id="login-screen" class="login-screen">
-  <div class="login-icon">🏍️</div>
-  <div class="login-title">Welcome to MotoDesk</div>
-  <div class="login-sub">Sign in with Google to sync your inventory and data across all your devices via Google Sheets.</div>
-  <button class="btn btn-primary" style="font-size:15px; padding:14px 28px;" onclick="signIn()">
-    <svg width="18" height="18" viewBox="0 0 48 48" style="vertical-align:middle;margin-right:6px;"><path fill="#FFC107" d="M43.6 20H24v8h11.3C33.6 33.1 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3 0 5.8 1.1 7.9 3l5.7-5.7C34.1 6.5 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20c11 0 19.7-8 19.7-20 0-1.3-.1-2.7-.1-4z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.6 15.1 18.9 12 24 12c3 0 5.8 1.1 7.9 3l5.7-5.7C34.1 6.5 29.3 4 24 4 16.3 4 9.7 8.4 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-1.9 13.5-5l-6.2-5.2C29.5 35.6 26.9 36 24 36c-5.2 0-9.6-2.9-11.3-7.1l-6.5 5C9.5 39.5 16.3 44 24 44z"/><path fill="#1976D2" d="M43.6 20H24v8h11.3c-.8 2.3-2.3 4.2-4.3 5.5l6.2 5.2C41 35.3 44 30 44 24c0-1.3-.1-2.7-.4-4z"/></svg>
-    Sign in with Google
-  </button>
-  <div style="margin-top:16px; font-size:12px; color:var(--muted);">Your data is stored in your own Google Sheet — you own it completely.</div>
-</div>
-
-<div id="app-content" style="display:none;">
 <!-- DASHBOARD -->
 <div class="page active" id="page-dashboard">
   <div style="margin-bottom:20px; margin-top:4px;">
@@ -298,7 +279,6 @@
   <div id="search-results"></div>
 </div>
 
-</div><!-- end app-content -->
 
 <!-- MODAL: Add/Edit Motorcycle -->
 <div class="modal-overlay" id="modal-moto">
@@ -409,236 +389,84 @@
 
 <script>
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
-const CLIENT_ID = '330922450601-odfc4jgfn7366a2u17nh3vhg37be1s3d.apps.googleusercontent.com';
-const SCOPES = 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.file';
-const SHEET_NAME_MOTOS = 'Motos';
-const SHEET_NAME_EXP   = 'Expenses';
+const API_URL = 'https://script.google.com/macros/s/AKfycbwDUMj3Y8pRXwzP4TUEzcIalTFCWm15kT4ldCg6e_KisUWqozMYkL84uDu1m3tG_SdV9w/exec';
 
-// ─── STATE ────────────────────────────────────────────────────────────────────
-let accessToken   = null;
-let sheetId       = localStorage.getItem('sheetId') || null;
-let motos         = [];
-let expenses      = [];
-let editMotoId    = null;
-let isSyncing     = false;
-
-// ─── LOCAL CACHE ──────────────────────────────────────────────────────────────
+// ─── DATA ─────────────────────────────────────────────────────────────────────
 const DB = {
   load(key, def=[]) { try { return JSON.parse(localStorage.getItem(key)) || def; } catch { return def; } },
   save(key, data)   { localStorage.setItem(key, JSON.stringify(data)); }
 };
 
-// ─── GOOGLE AUTH ──────────────────────────────────────────────────────────────
-function waitForGoogle(cb, tries=0) {
-  if(typeof google !== 'undefined' && google.accounts) { cb(); return; }
-  if(tries > 30) { alert('Google sign-in failed to load. Please check your internet connection and reload the page.'); return; }
-  setTimeout(() => waitForGoogle(cb, tries+1), 300);
-}
+let motos    = DB.load('motos');
+let expenses = DB.load('expenses');
+let editMotoId = null;
+let isSyncing  = false;
 
-function signIn() {
-  setSyncStatus('orange', 'Button tapped — loading…');
-  alert('Sign in button tapped! Waiting for Google…');
-  waitForGoogle(() => {
-    alert('Google loaded! Opening sign-in popup…');
-    try {
-      const client = google.accounts.oauth2.initTokenClient({
-        client_id: CLIENT_ID,
-        scope: SCOPES,
-        callback: async (resp) => {
-          if(resp.error) {
-            setSyncStatus('red', 'Sign in failed: ' + (resp.error_description || resp.error));
-            alert('Sign in failed: ' + (resp.error_description || resp.error));
-            return;
-          }
-          accessToken = resp.access_token;
-          localStorage.setItem('accessToken', accessToken);
-          setSyncStatus('orange', 'Signed in, loading data…');
-          showApp();
-          await initSheet();
-          await loadFromSheet();
-        }
-      });
-      client.requestAccessToken();
-    } catch(e) {
-      setSyncStatus('red', 'Error: ' + e.message);
-      alert('Sign in error: ' + e.message);
-    }
-  });
-}
+function uid() { return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
 
-function signOut() {
-  accessToken = null;
-  localStorage.removeItem('accessToken');
-  localStorage.removeItem('sheetId');
-  sheetId = null;
-  setSyncStatus('grey', 'Not signed in');
-  document.getElementById('login-screen').style.display = 'flex';
-  document.getElementById('app-content').style.display  = 'none';
-  document.getElementById('sync-actions').innerHTML = '<button class="btn btn-primary btn-sm" onclick="signIn()">Sign in with Google</button>';
-}
-
-function showApp() {
-  document.getElementById('login-screen').style.display = 'none';
-  document.getElementById('app-content').style.display  = 'block';
-  document.getElementById('sync-actions').innerHTML = `
-    <span style="color:var(--muted);font-size:11px;" id="user-email"></span>
-    <button class="btn btn-ghost btn-sm" onclick="loadFromSheet()" style="margin-left:6px;">↻ Sync</button>
-    <button class="btn btn-ghost btn-sm" onclick="signOut()" style="margin-left:4px;">Sign out</button>`;
-}
-
-// ─── SHEET INIT ───────────────────────────────────────────────────────────────
-async function initSheet() {
-  if(sheetId) { await ensureSheetTabs(); return; }
-  // Create new spreadsheet
-  setSyncStatus('orange', 'Creating MotoDesk sheet…');
-  const res = await gapi('https://sheets.googleapis.com/v4/spreadsheets', 'POST', {
-    properties: { title: 'MotoDesk Data' },
-    sheets: [
-      { properties: { title: SHEET_NAME_MOTOS } },
-      { properties: { title: SHEET_NAME_EXP   } }
-    ]
-  });
-  sheetId = res.spreadsheetId;
-  localStorage.setItem('sheetId', sheetId);
-  // Write headers
-  await writeHeaders();
-  setSyncStatus('green', 'Sheet created!');
-}
-
-async function ensureSheetTabs() {
-  try {
-    const res = await gapi(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}`, 'GET');
-    const titles = res.sheets.map(s=>s.properties.title);
-    const toAdd = [];
-    if(!titles.includes(SHEET_NAME_MOTOS)) toAdd.push({addSheet:{properties:{title:SHEET_NAME_MOTOS}}});
-    if(!titles.includes(SHEET_NAME_EXP))   toAdd.push({addSheet:{properties:{title:SHEET_NAME_EXP}}});
-    if(toAdd.length) {
-      await gapi(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}:batchUpdate`,'POST',{requests:toAdd});
-      await writeHeaders();
-    }
-  } catch(e) { sheetId=null; localStorage.removeItem('sheetId'); await initSheet(); }
-}
-
+// ─── SHEET SYNC ───────────────────────────────────────────────────────────────
 const MOTO_HEADERS = ['id','make','model','year','plate','chassis','color','mileage','buyPrice','sellPrice','notes','sellerName','sellerPhone','sellerAddress','buyerName','buyerPhone','buyerAddress','saleDate','status','createdAt'];
 const EXP_HEADERS  = ['id','motoId','desc','amount','date','category','notes','createdAt'];
 
-async function writeHeaders() {
-  await sheetUpdate(`${SHEET_NAME_MOTOS}!A1`, [MOTO_HEADERS]);
-  await sheetUpdate(`${SHEET_NAME_EXP}!A1`,  [EXP_HEADERS]);
-}
-
-// ─── SHEET READ/WRITE ─────────────────────────────────────────────────────────
 async function loadFromSheet() {
   setSyncStatus('orange', 'Syncing…');
-  isSyncing = true;
   try {
-    const [motoRows, expRows] = await Promise.all([
-      sheetRead(`${SHEET_NAME_MOTOS}!A1:T5000`),
-      sheetRead(`${SHEET_NAME_EXP}!A1:H5000`)
+    const [mRes, eRes] = await Promise.all([
+      fetch(API_URL + '?action=read&sheet=Motos').then(r=>r.json()),
+      fetch(API_URL + '?action=read&sheet=Expenses').then(r=>r.json())
     ]);
-    motos    = rowsToObjects(motoRows, MOTO_HEADERS);
-    expenses = rowsToObjects(expRows,  EXP_HEADERS);
-    DB.save('motos', motos);
-    DB.save('expenses', expenses);
-    setSyncStatus('green', `Synced — ${motos.length} bikes, ${expenses.length} expenses`);
+    if(mRes.data && mRes.data.length > 1) {
+      motos = mRes.data.slice(1).map(row => {
+        const obj = {};
+        MOTO_HEADERS.forEach((h,i) => obj[h] = row[i] ?? '');
+        return obj;
+      }).filter(o=>o.id);
+      DB.save('motos', motos);
+    }
+    if(eRes.data && eRes.data.length > 1) {
+      expenses = eRes.data.slice(1).map(row => {
+        const obj = {};
+        EXP_HEADERS.forEach((h,i) => obj[h] = row[i] ?? '');
+        return obj;
+      }).filter(o=>o.id);
+      DB.save('expenses', expenses);
+    }
+    setSyncStatus('green', 'Synced ✓');
     renderDashboard();
     renderInventory(currentFilter);
     renderExpenses();
   } catch(e) {
     setSyncStatus('red', 'Sync failed — using local data');
-    motos    = DB.load('motos');
-    expenses = DB.load('expenses');
-    renderDashboard();
   }
-  isSyncing = false;
 }
 
 async function saveToSheet() {
-  if(!accessToken || !sheetId) { DB.save('motos',motos); DB.save('expenses',expenses); return; }
+  DB.save('motos', motos);
+  DB.save('expenses', expenses);
   setSyncStatus('orange', 'Saving…');
   try {
-    const motoRows = [MOTO_HEADERS, ...motos.map(m=>MOTO_HEADERS.map(k=>m[k]??''))];
-    const expRows  = [EXP_HEADERS,  ...expenses.map(e=>EXP_HEADERS.map(k=>e[k]??''))];
-    await sheetClear(SHEET_NAME_MOTOS);
-    await sheetClear(SHEET_NAME_EXP);
-    await sheetUpdate(`${SHEET_NAME_MOTOS}!A1`, motoRows);
-    await sheetUpdate(`${SHEET_NAME_EXP}!A1`,  expRows);
-    DB.save('motos', motos);
-    DB.save('expenses', expenses);
+    const motoRows = [MOTO_HEADERS, ...motos.map(m => MOTO_HEADERS.map(k => m[k] ?? ''))];
+    const expRows  = [EXP_HEADERS,  ...expenses.map(e => EXP_HEADERS.map(k => e[k] ?? ''))];
+    await Promise.all([
+      fetch(API_URL + '?action=write&sheet=Motos', {
+        method: 'POST', body: JSON.stringify({data: motoRows})
+      }),
+      fetch(API_URL + '?action=write&sheet=Expenses', {
+        method: 'POST', body: JSON.stringify({data: expRows})
+      })
+    ]);
     setSyncStatus('green', 'Saved to Google Sheets ✓');
   } catch(e) {
     setSyncStatus('red', 'Save failed — stored locally');
-    DB.save('motos', motos);
-    DB.save('expenses', expenses);
   }
 }
 
-// ─── SHEET HELPERS ────────────────────────────────────────────────────────────
-async function sheetRead(range) {
-  const res = await gapi(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent(range)}`, 'GET');
-  return res.values || [];
-}
-async function sheetUpdate(range, values) {
-  await gapi(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent(range)}?valueInputOption=RAW`, 'PUT', { values });
-}
-async function sheetClear(tab) {
-  await gapi(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent(tab)}:clear`, 'POST', {});
-}
-function rowsToObjects(rows, headers) {
-  if(rows.length < 2) return [];
-  return rows.slice(1).map(row => {
-    const obj = {};
-    headers.forEach((h,i) => obj[h] = row[i] ?? '');
-    return obj;
-  }).filter(o=>o.id);
-}
-async function gapi(url, method, body) {
-  const opts = { method, headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' } };
-  if(body) opts.body = JSON.stringify(body);
-  const res = await fetch(url, opts);
-  if(!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-
-// ─── SYNC STATUS UI ───────────────────────────────────────────────────────────
 function setSyncStatus(color, msg) {
   const dot = document.getElementById('sync-dot');
   const txt = document.getElementById('sync-status');
-  if(dot) { dot.className = `sync-dot ${color}`; }
+  if(dot) dot.className = `sync-dot ${color}`;
   if(txt) txt.textContent = msg;
 }
-
-// seed sample data if empty
-if (!motos.length) {
-  motos = [
-    { id: uid(), make:'Honda', model:'CB500F', year:2018, plate:'MH 12 XY 9010', chassis:'ME4JC921XKA100123', color:'Black', mileage:22000,
-      buyPrice:52000, sellPrice:68000, notes:'Minor scratches on tank',
-      sellerName:'James Ford', sellerPhone:'555-1001', sellerAddress:'12 Oak St, Denver',
-      buyerName:'Maria Lopez', buyerPhone:'555-2002', buyerAddress:'99 Maple Ave, Denver',
-      saleDate:'2024-03-10', status:'sold', createdAt: Date.now()-86400000*10 },
-    { id: uid(), make:'Yamaha', model:'MT-07', year:2020, plate:'KA 05 AB 4550', chassis:'ME1RG0503L0023456', color:'Blue', mileage:9800,
-      buyPrice:85000, sellPrice:110000, notes:'Excellent condition, new chain',
-      sellerName:'Tony Green', sellerPhone:'555-3003', sellerAddress:'7 Pine Rd, Boulder',
-      buyerName:'', buyerPhone:'', buyerAddress:'',
-      saleDate:'', status:'available', createdAt: Date.now()-86400000*3 },
-    { id: uid(), make:'Kawasaki', model:'Z650', year:2019, plate:'DL 8C AZ 2120', chassis:'JKAZR0A16KA012345', color:'Green', mileage:14300,
-      buyPrice:62000, sellPrice:82000, notes:'Needs new brake pads',
-      sellerName:'Sarah Kim', sellerPhone:'555-4004', sellerAddress:'3 Birch Lane, Aurora',
-      buyerName:'', buyerPhone:'', buyerAddress:'',
-      saleDate:'', status:'available', createdAt: Date.now()-86400000 }
-  ];
-  DB.save('motos', motos);
-}
-if (!expenses.length) {
-  expenses = [
-    { id: uid(), motoId: motos[0].id, desc:'Full service + oil change', amount:2500, date:'2024-02-20', category:'Engine', notes:'', createdAt:Date.now()-86400000*15 },
-    { id: uid(), motoId: motos[1].id, desc:'New rear tyre', amount:3800, date:'2024-03-01', category:'Tires', notes:'Pirelli Angel GT', createdAt:Date.now()-86400000*5 },
-    { id: uid(), motoId: motos[2].id, desc:'Brake pads front+rear', amount:1200, date:'2024-03-08', category:'Brakes', notes:'', createdAt:Date.now()-86400000*2 }
-  ];
-  DB.save('expenses', expenses);
-}
-
-function uid() { return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
 
 // ─── NAVIGATION ───────────────────────────────────────────────────────────────
 function showPage(id) {
@@ -654,6 +482,11 @@ function showPage(id) {
 
 // ─── DASHBOARD ────────────────────────────────────────────────────────────────
 function renderDashboard() {
+  const now        = new Date();
+  const thisYear   = now.getFullYear();
+  const thisMonth  = now.getMonth();
+  const monthName  = now.toLocaleString('default',{month:'long'});
+
   const totalExp   = expenses.reduce((s,e)=>s+Number(e.amount),0);
   const available  = motos.filter(m=>m.status==='available').length;
   const sold       = motos.filter(m=>m.status==='sold').length;
@@ -665,11 +498,45 @@ function renderDashboard() {
 
   document.getElementById('stats-grid').innerHTML = `
     <div class="stat-card"><div class="stat-label">Available</div><div class="stat-value orange">${available}</div></div>
-    <div class="stat-card"><div class="stat-label">Sold</div><div class="stat-value blue">${sold}</div></div>
+    <div class="stat-card"><div class="stat-label">Total Sold</div><div class="stat-value blue">${sold}</div></div>
     <div class="stat-card"><div class="stat-label">Total Expenses</div><div class="stat-value red">₹${fmt(totalExp)}</div></div>
-    <div class="stat-card"><div class="stat-label">Net Profit</div><div class="stat-value ${profit>=0?'green':'red'}">₹${fmt(profit)}</div></div>
+    <div class="stat-card"><div class="stat-label">Net Profit</div><div class="stat-value ${profit>=0?'green':'red'}">${profit>=0?'+':''} ₹${fmt(profit)}</div></div>
   `;
 
+  const monthSold = motos.filter(m=>{
+    if(m.status!=='sold' || !m.saleDate) return false;
+    const d = new Date(m.saleDate);
+    return d.getFullYear()===thisYear && d.getMonth()===thisMonth;
+  });
+
+  const monthRevenue = monthSold.reduce((s,m)=>s+Number(m.sellPrice||0),0);
+  const monthCogs    = monthSold.reduce((s,m)=>s+Number(m.buyPrice||0),0);
+  const monthExp     = expenses.filter(e=>monthSold.find(m=>m.id===e.motoId)).reduce((s,e)=>s+Number(e.amount),0);
+  const monthProfit  = monthRevenue - monthCogs - monthExp;
+
+  document.getElementById('month-label').textContent = `${monthName} ${thisYear}`;
+  document.getElementById('month-stats').innerHTML = `
+    <div class="stat-card"><div class="stat-label">Bikes Sold</div><div class="stat-value orange">${monthSold.length}</div></div>
+    <div class="stat-card"><div class="stat-label">Revenue</div><div class="stat-value blue" style="font-size:22px;">₹${fmt(monthRevenue)}</div></div>
+    <div class="stat-card"><div class="stat-label">Expenses</div><div class="stat-value red" style="font-size:22px;">₹${fmt(monthExp)}</div></div>
+    <div class="stat-card"><div class="stat-label">Profit</div><div class="stat-value ${monthProfit>=0?'green':'red'}" style="font-size:22px;">${monthProfit>=0?'+':''} ₹${fmt(monthProfit)}</div></div>
+  `;
+
+  document.getElementById('month-sold-list').innerHTML = monthSold.length
+    ? monthSold.map(m=>`
+    <div class="moto-card" style="cursor:pointer;" onclick="openDetail('${m.id}')">
+      <div class="moto-header">
+        <div class="moto-title">${m.year} ${m.make} ${m.model}</div>
+        <span class="badge badge-sold">sold</span>
+      </div>
+      <div class="moto-meta">
+        <span>🔖 <b>${m.plate||'—'}</b></span>
+        <span>📅 <b>${m.saleDate}</b></span>
+        <span>🏷️ <b>₹${fmt(m.sellPrice)}</b></span>
+        ${m.buyerName?`<span>🛒 <b>${m.buyerName}</b></span>`:''}
+      </div>
+    </div>`).join('')
+    : '<div class="empty"><div class="empty-icon">📭</div>No sales this month yet</div>';
 }
 
 // ─── INVENTORY ────────────────────────────────────────────────────────────────
@@ -722,7 +589,6 @@ function renderExpenses() {
     if(!grouped[key]) grouped[key]=[];
     grouped[key].push(e);
   });
-
   el.innerHTML = Object.entries(grouped).map(([key,exps])=>{
     const total = exps.reduce((s,e)=>s+Number(e.amount),0);
     return `<div class="card" style="margin-bottom:14px;">
@@ -826,9 +692,9 @@ function openEditMoto(id) {
 async function saveMoto() {
   const m = {
     id: editMotoId || uid(),
-    make: v('m-make'), model: v('m-model'), year: v('m-year'), plate: v('m-plate'), chassis: v('m-chassis'),
-    color: v('m-color'), mileage: v('m-mileage'), buyPrice: v('m-buy-price'),
-    sellPrice: v('m-sell-price'), notes: v('m-notes'),
+    make: v('m-make'), model: v('m-model'), year: v('m-year'), plate: v('m-plate'),
+    chassis: v('m-chassis'), color: v('m-color'), mileage: v('m-mileage'),
+    buyPrice: v('m-buy-price'), sellPrice: v('m-sell-price'), notes: v('m-notes'),
     sellerName: v('m-seller-name'), sellerPhone: v('m-seller-phone'), sellerAddress: v('m-seller-address'),
     buyerName: v('m-buyer-name'), buyerPhone: v('m-buyer-phone'), buyerAddress: v('m-buyer-address'),
     saleDate: v('m-sale-date'), status: v('m-status'),
@@ -837,17 +703,17 @@ async function saveMoto() {
   if(!m.make || !m.model) { alert('Make and Model are required.'); return; }
   if(editMotoId) { motos = motos.map(x=>x.id===editMotoId?m:x); }
   else { motos.unshift(m); }
-  await saveToSheet();
   closeModal('modal-moto');
   renderInventory(currentFilter);
+  await saveToSheet();
 }
 
 async function deleteMoto(id) {
   if(!confirm('Delete this motorcycle? All linked expenses will also be removed.')) return;
   motos = motos.filter(m=>m.id!==id);
   expenses = expenses.filter(e=>e.motoId!==id);
-  await saveToSheet();
   renderInventory(currentFilter);
+  await saveToSheet();
 }
 
 function openAddExpense() {
@@ -873,15 +739,28 @@ async function saveExpense() {
                date:v('e-date'), category:v('e-category'), notes:v('e-notes'), createdAt:Date.now() };
   if(!e.desc || !e.amount) { alert('Description and amount required.'); return; }
   expenses.unshift(e);
-  await saveToSheet();
   closeModal('modal-expense');
   renderExpenses();
+  await saveToSheet();
 }
 async function deleteExpense(id) {
   if(!confirm('Remove this expense?')) return;
   expenses = expenses.filter(e=>e.id!==id);
-  await saveToSheet();
   renderExpenses();
+  await saveToSheet();
+}
+
+// ─── RETURN VEHICLE ───────────────────────────────────────────────────────────
+async function returnVehicle(id) {
+  if(!confirm('Mark this vehicle as returned? It will be set back to Available and buyer details will be cleared.')) return;
+  motos = motos.map(m=>{
+    if(m.id!==id) return m;
+    return {...m, status:'available', buyerName:'', buyerPhone:'', buyerAddress:'', saleDate:''};
+  });
+  closeModal('modal-detail');
+  renderDashboard();
+  renderInventory(currentFilter);
+  await saveToSheet();
 }
 
 // ─── DETAIL MODAL ─────────────────────────────────────────────────────────────
@@ -894,7 +773,7 @@ function openDetail(id) {
 
   document.getElementById('detail-title').textContent = `${m.year} ${m.make} ${m.model}`;
   document.getElementById('detail-body').innerHTML = `
-    <div style="margin-bottom:12px; display:flex; gap:8px; align-items:center;">
+    <div style="margin-bottom:12px; display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
       <span class="badge badge-${m.status}">${m.status}</span>
       ${m.plate?`<span class="tag">🔖 ${m.plate}</span>`:''}
       ${m.chassis?`<span class="tag">🔩 ${m.chassis}</span>`:''}
@@ -943,69 +822,18 @@ function openDetail(id) {
   openModal('modal-detail');
 }
 
-// ─── RETURN VEHICLE ───────────────────────────────────────────────────────────
-function returnVehicle(id) {
-  if(!confirm('Mark this vehicle as returned? It will be set back to Available and buyer details will be cleared.')) return;
-  motos = motos.map(m=>{
-    if(m.id!==id) return m;
-    return {...m, status:'available', buyerName:'', buyerPhone:'', buyerAddress:'', saleDate:''};
-  });
-  await saveToSheet();
-  closeModal('modal-detail');
-  renderDashboard();
-  renderInventory(currentFilter);
-}
-
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 function v(id) { return document.getElementById(id).value.trim(); }
 function fmt(n) { return Number(n||0).toLocaleString('en-IN',{minimumFractionDigits:0,maximumFractionDigits:0}); }
 function today() { return new Date().toISOString().slice(0,10); }
 
-// close modal on overlay click
 document.querySelectorAll('.modal-overlay').forEach(o=>{
   o.addEventListener('click', e=>{ if(e.target===o) o.classList.remove('open'); });
 });
 
 // ─── INIT ─────────────────────────────────────────────────────────────────────
-async function init() {
-  motos    = DB.load('motos');
-  expenses = DB.load('expenses');
-
-  const storedToken = localStorage.getItem('accessToken');
-  if(storedToken) {
-    accessToken = storedToken;
-    showApp();
-    setSyncStatus('orange', 'Restoring session…');
-    renderDashboard();
-    // Re-request token silently
-    waitForGoogle(() => {
-      try {
-        const client = google.accounts.oauth2.initTokenClient({
-          client_id: CLIENT_ID,
-          scope: SCOPES,
-          prompt: '',
-          callback: async (resp) => {
-            if(resp.error) { setSyncStatus('grey','Session expired — please sign in again'); return; }
-            accessToken = resp.access_token;
-            localStorage.setItem('accessToken', accessToken);
-            await initSheet();
-            await loadFromSheet();
-          }
-        });
-        client.requestAccessToken({prompt:''});
-      } catch(e) {
-        renderDashboard();
-        setSyncStatus('grey','Sign in to sync');
-      }
-    });
-  } else {
-    document.getElementById('login-screen').style.display = 'flex';
-    document.getElementById('app-content').style.display  = 'none';
-  }
-}
-
-init();
+renderDashboard();
+loadFromSheet();
 </script>
 </body>
 </html>
-
