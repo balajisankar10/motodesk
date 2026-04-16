@@ -332,6 +332,30 @@
             </select>
           </div>
         </div>
+        <div class="field"><label>Payment Mode</label>
+          <select id="m-payment-mode">
+            <option value="">— Select —</option>
+            <option value="Cash">Cash</option>
+            <option value="Online Transaction">Online Transaction</option>
+            <option value="Online + Cash">Online + Cash</option>
+            <option value="Exchange + Cash">Exchange + Cash</option>
+            <option value="Exchange + Online">Exchange + Online</option>
+            <option value="Exchange + Online + Cash">Exchange + Online + Cash</option>
+          </select>
+        </div>
+        <div class="form-grid form-grid-2">
+          <div class="field"><label>Payment Status</label>
+            <select id="m-payment-status" onchange="toggleBalance()">
+              <option value="">— Select —</option>
+              <option value="Paid in Full">Paid in Full</option>
+              <option value="Partially Paid">Partially Paid</option>
+            </select>
+          </div>
+          <div class="field" id="balance-field" style="display:none;">
+            <label>Balance Amount (₹)</label>
+            <input id="m-balance" type="number" placeholder="0"/>
+          </div>
+        </div>
       </div>
     </div>
     <div class="modal-footer">
@@ -405,7 +429,7 @@ let isSyncing  = false;
 function uid() { return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
 
 // ─── SHEET SYNC ───────────────────────────────────────────────────────────────
-const MOTO_HEADERS = ['id','make','model','year','plate','chassis','color','mileage','buyPrice','sellPrice','notes','sellerName','sellerPhone','sellerAddress','buyerName','buyerPhone','buyerAddress','saleDate','status','createdAt'];
+const MOTO_HEADERS = ['id','make','model','year','plate','chassis','color','mileage','buyPrice','sellPrice','notes','sellerName','sellerPhone','sellerAddress','buyerName','buyerPhone','buyerAddress','saleDate','status','createdAt','paymentMode','paymentStatus','balance'];
 const EXP_HEADERS  = ['id','motoId','desc','amount','date','category','notes','createdAt'];
 
 async function loadFromSheet() {
@@ -534,6 +558,8 @@ function renderDashboard() {
         <span>📅 <b>${m.saleDate}</b></span>
         <span>🏷️ <b>₹${fmt(m.sellPrice)}</b></span>
         ${m.buyerName?`<span>🛒 <b>${m.buyerName}</b></span>`:''}
+        ${m.paymentStatus?`<span style="color:${m.paymentStatus==='Paid in Full'?'var(--green)':'var(--red)'}">💳 <b>${m.paymentStatus}</b></span>`:''}
+        ${m.paymentStatus==='Partially Paid'&&m.balance?`<span style="color:var(--red)">⚠️ Balance: <b>₹${fmt(m.balance)}</b></span>`:''}
       </div>
     </div>`).join('')
     : '<div class="empty"><div class="empty-icon">📭</div>No sales this month yet</div>';
@@ -648,6 +674,13 @@ function renderSearch(results) {
 }
 
 // ─── MODALS ───────────────────────────────────────────────────────────────────
+function toggleBalance() {
+  const status = document.getElementById('m-payment-status').value;
+  const balField = document.getElementById('balance-field');
+  balField.style.display = status === 'Partially Paid' ? 'block' : 'none';
+  if(status !== 'Partially Paid') document.getElementById('m-balance').value = '';
+}
+
 function openModal(id) { document.getElementById(id).classList.add('open'); }
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
 
@@ -656,10 +689,11 @@ function openAddMoto() {
   document.getElementById('modal-moto-title').textContent = 'ADD MOTORCYCLE';
   ['make','model','year','plate','chassis','color','mileage','buy-price','sell-price','notes',
    'seller-name','seller-phone','seller-address',
-   'buyer-name','buyer-phone','buyer-address','sale-date'].forEach(f=>{
+   'buyer-name','buyer-phone','buyer-address','sale-date','payment-mode','payment-status','balance'].forEach(f=>{
     document.getElementById('m-'+f).value='';
   });
   document.getElementById('m-status').value='available';
+  document.getElementById('balance-field').style.display='none';
   openModal('modal-moto');
 }
 
@@ -686,6 +720,10 @@ function openEditMoto(id) {
   document.getElementById('m-buyer-address').value=m.buyerAddress||'';
   document.getElementById('m-sale-date').value=m.saleDate||'';
   document.getElementById('m-status').value=m.status||'available';
+  document.getElementById('m-payment-mode').value=m.paymentMode||'';
+  document.getElementById('m-payment-status').value=m.paymentStatus||'';
+  document.getElementById('m-balance').value=m.balance||'';
+  document.getElementById('balance-field').style.display = m.paymentStatus==='Partially Paid' ? 'block' : 'none';
   openModal('modal-moto');
 }
 
@@ -698,6 +736,8 @@ async function saveMoto() {
     sellerName: v('m-seller-name'), sellerPhone: v('m-seller-phone'), sellerAddress: v('m-seller-address'),
     buyerName: v('m-buyer-name'), buyerPhone: v('m-buyer-phone'), buyerAddress: v('m-buyer-address'),
     saleDate: v('m-sale-date'), status: v('m-status'),
+    paymentMode: v('m-payment-mode'), paymentStatus: v('m-payment-status'),
+    balance: v('m-balance'),
     createdAt: editMotoId ? (motos.find(x=>x.id===editMotoId)||{}).createdAt||Date.now() : Date.now()
   };
   if(!m.make || !m.model) { alert('Make and Model are required.'); return; }
@@ -807,6 +847,9 @@ function openDetail(id) {
       ${m.buyerName?`<div class="detail-item"><div class="detail-label">Name</div><div class="detail-value">${m.buyerName}</div></div>`:''}
       ${m.buyerPhone?`<div class="detail-item"><div class="detail-label">Phone</div><div class="detail-value">${m.buyerPhone}</div></div>`:''}
       ${m.saleDate?`<div class="detail-item"><div class="detail-label">Sale Date</div><div class="detail-value">${m.saleDate}</div></div>`:''}
+      ${m.paymentMode?`<div class="detail-item"><div class="detail-label">Payment Mode</div><div class="detail-value">${m.paymentMode}</div></div>`:''}
+      ${m.paymentStatus?`<div class="detail-item"><div class="detail-label">Payment Status</div><div class="detail-value" style="color:${m.paymentStatus==='Paid in Full'?'var(--green)':'var(--red)'}">${m.paymentStatus}</div></div>`:''}
+      ${m.paymentStatus==='Partially Paid'&&m.balance?`<div class="detail-item"><div class="detail-label">Balance Due</div><div class="detail-value" style="color:var(--red);font-weight:700;">₹${fmt(m.balance)}</div></div>`:''}
       ${m.buyerAddress?`<div class="detail-item" style="grid-column:1/-1;"><div class="detail-label">Address</div><div class="detail-value">${m.buyerAddress}</div></div>`:''}
     </div>`:'<div style="color:var(--muted); font-size:13px; margin-bottom:14px;">Not sold yet</div>'}
     ${exp.length?`
