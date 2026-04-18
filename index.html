@@ -105,7 +105,10 @@
     color: var(--text); border-radius: 8px;
     padding: 10px 12px; font-family: 'DM Sans', sans-serif; font-size: 14px;
     outline: none; transition: border .2s; width: 100%;
+    text-transform: uppercase;
   }
+  input::placeholder, textarea::placeholder { text-transform: uppercase; }
+  select option { text-transform: uppercase; }
   input:focus, select:focus, textarea:focus { border-color: var(--accent); }
   select option { background: var(--surface2); }
   textarea { resize: vertical; min-height: 70px; }
@@ -332,16 +335,19 @@
             </select>
           </div>
         </div>
-        <div class="field"><label>Payment Mode</label>
-          <select id="m-payment-mode">
-            <option value="">— Select —</option>
-            <option value="Cash">Cash</option>
-            <option value="Online Transaction">Online Transaction</option>
-            <option value="Online + Cash">Online + Cash</option>
-            <option value="Exchange + Cash">Exchange + Cash</option>
-            <option value="Exchange + Online">Exchange + Online</option>
-            <option value="Exchange + Online + Cash">Exchange + Online + Cash</option>
-          </select>
+        <hr class="divider"/>
+        <div style="font-family:'Bebas Neue',sans-serif; font-size:16px; color:var(--green); letter-spacing:1px;">PAYMENT BREAKDOWN</div>
+        <div class="form-grid form-grid-2">
+          <div class="field"><label>Cash (₹)</label><input id="m-pay-cash" type="number" placeholder="0" style="text-transform:uppercase;"/></div>
+          <div class="field"><label>Online (₹)</label><input id="m-pay-online" type="number" placeholder="0"/></div>
+        </div>
+        <div class="form-grid form-grid-2">
+          <div class="field"><label>Finance (₹)</label><input id="m-pay-finance" type="number" placeholder="0"/></div>
+          <div class="field"><label>Exchange (₹)</label><input id="m-pay-exchange" type="number" placeholder="0"/></div>
+        </div>
+        <div class="form-grid form-grid-2">
+          <div class="field"><label>Exchange Vehicle Reg. No.</label><input id="m-exchange-reg" placeholder="EX. MH 12 AB 1234" style="text-transform:uppercase;"/></div>
+          <div class="field"><label>Exchange Vehicle Type</label><input id="m-exchange-type" placeholder="EX. HONDA ACTIVA" style="text-transform:uppercase;"/></div>
         </div>
         <div class="form-grid form-grid-2">
           <div class="field"><label>Payment Status</label>
@@ -355,6 +361,38 @@
             <label>Balance Amount (₹)</label>
             <input id="m-balance" type="number" placeholder="0"/>
           </div>
+        </div>
+
+        <hr class="divider"/>
+        <div style="font-family:'Bebas Neue',sans-serif; font-size:16px; color:var(--accent); letter-spacing:1px;">DOCUMENT STATUS</div>
+        <div class="form-grid form-grid-2">
+          <div class="field"><label>RC Book Status</label>
+            <select id="m-rc-status">
+              <option value="">— Select —</option>
+              <option value="Received">Received</option>
+              <option value="Issued">Issued</option>
+              <option value="Pending">Pending</option>
+              <option value="Not Available">Not Available</option>
+            </select>
+          </div>
+          <div class="field"><label>NOC Status</label>
+            <select id="m-noc-status">
+              <option value="">— Select —</option>
+              <option value="Received">Received</option>
+              <option value="Issued">Issued</option>
+              <option value="Pending">Pending</option>
+              <option value="Not Available">Not Available</option>
+            </select>
+          </div>
+        </div>
+        <div class="field"><label>Insurance Status</label>
+          <select id="m-insurance-status">
+            <option value="">— Select —</option>
+            <option value="Received">Received</option>
+            <option value="Issued">Issued</option>
+            <option value="Pending">Pending</option>
+            <option value="Not Available">Not Available</option>
+          </select>
         </div>
       </div>
     </div>
@@ -429,7 +467,7 @@ let isSyncing  = false;
 function uid() { return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
 
 // ─── SHEET SYNC ───────────────────────────────────────────────────────────────
-const MOTO_HEADERS = ['id','make','model','year','plate','chassis','color','mileage','buyPrice','sellPrice','notes','sellerName','sellerPhone','sellerAddress','buyerName','buyerPhone','buyerAddress','saleDate','status','createdAt','paymentMode','paymentStatus','balance'];
+const MOTO_HEADERS = ['id','make','model','year','plate','chassis','color','mileage','buyPrice','sellPrice','notes','sellerName','sellerPhone','sellerAddress','buyerName','buyerPhone','buyerAddress','saleDate','status','createdAt','payCash','payOnline','payFinance','payExchange','exchangeReg','exchangeType','paymentStatus','balance','rcStatus','nocStatus','insuranceStatus'];
 const EXP_HEADERS  = ['id','motoId','desc','amount','date','category','notes','createdAt'];
 
 async function loadFromSheet() {
@@ -555,7 +593,7 @@ function renderDashboard() {
       </div>
       <div class="moto-meta">
         <span>🔖 <b>${m.plate||'—'}</b></span>
-        <span>📅 <b>${m.saleDate}</b></span>
+        <span>📅 <b>${fmtDate(m.saleDate)}</b></span>
         <span>🏷️ <b>₹${fmt(m.sellPrice)}</b></span>
         ${m.buyerName?`<span>🛒 <b>${m.buyerName}</b></span>`:''}
         ${m.paymentStatus?`<span style="color:${m.paymentStatus==='Paid in Full'?'var(--green)':'var(--red)'}">💳 <b>${m.paymentStatus}</b></span>`:''}
@@ -627,7 +665,7 @@ function renderExpenses() {
         <div class="expense-row">
           <div class="expense-desc">
             <div style="font-weight:500;">${e.desc}</div>
-            <div style="font-size:12px; color:var(--muted);">${e.date} · <span class="tag">${e.category}</span></div>
+            <div style="font-size:12px; color:var(--muted);">${fmtDate(e.date)} · <span class="tag">${e.category}</span></div>
           </div>
           <div style="display:flex; align-items:center; gap:10px;">
             <span class="expense-amount">-₹${fmt(e.amount)}</span>
@@ -689,10 +727,14 @@ function openAddMoto() {
   document.getElementById('modal-moto-title').textContent = 'ADD MOTORCYCLE';
   ['make','model','year','plate','chassis','color','mileage','buy-price','sell-price','notes',
    'seller-name','seller-phone','seller-address',
-   'buyer-name','buyer-phone','buyer-address','sale-date','payment-mode','payment-status','balance'].forEach(f=>{
+   'buyer-name','buyer-phone','buyer-address','sale-date','pay-cash','pay-online','pay-finance','pay-exchange','exchange-reg','exchange-type','payment-status','balance','rc-status','noc-status','insurance-status'].forEach(f=>{
     document.getElementById('m-'+f).value='';
   });
   document.getElementById('m-status').value='available';
+  document.getElementById('m-payment-status').value='';
+  document.getElementById('m-rc-status').value='';
+  document.getElementById('m-noc-status').value='';
+  document.getElementById('m-insurance-status').value='';
   document.getElementById('balance-field').style.display='none';
   openModal('modal-moto');
 }
@@ -720,10 +762,18 @@ function openEditMoto(id) {
   document.getElementById('m-buyer-address').value=m.buyerAddress||'';
   document.getElementById('m-sale-date').value=m.saleDate||'';
   document.getElementById('m-status').value=m.status||'available';
-  document.getElementById('m-payment-mode').value=m.paymentMode||'';
+  document.getElementById('m-pay-cash').value=m.payCash||'';
+  document.getElementById('m-pay-online').value=m.payOnline||'';
+  document.getElementById('m-pay-finance').value=m.payFinance||'';
+  document.getElementById('m-pay-exchange').value=m.payExchange||'';
+  document.getElementById('m-exchange-reg').value=m.exchangeReg||'';
+  document.getElementById('m-exchange-type').value=m.exchangeType||'';
   document.getElementById('m-payment-status').value=m.paymentStatus||'';
   document.getElementById('m-balance').value=m.balance||'';
   document.getElementById('balance-field').style.display = m.paymentStatus==='Partially Paid' ? 'block' : 'none';
+  document.getElementById('m-rc-status').value=m.rcStatus||'';
+  document.getElementById('m-noc-status').value=m.nocStatus||'';
+  document.getElementById('m-insurance-status').value=m.insuranceStatus||'';
   openModal('modal-moto');
 }
 
@@ -736,8 +786,12 @@ async function saveMoto() {
     sellerName: v('m-seller-name'), sellerPhone: v('m-seller-phone'), sellerAddress: v('m-seller-address'),
     buyerName: v('m-buyer-name'), buyerPhone: v('m-buyer-phone'), buyerAddress: v('m-buyer-address'),
     saleDate: v('m-sale-date'), status: v('m-status'),
-    paymentMode: v('m-payment-mode'), paymentStatus: v('m-payment-status'),
-    balance: v('m-balance'),
+    payCash: v('m-pay-cash'), payOnline: v('m-pay-online'),
+    payFinance: v('m-pay-finance'), payExchange: v('m-pay-exchange'),
+    exchangeReg: v('m-exchange-reg'), exchangeType: v('m-exchange-type'),
+    paymentStatus: v('m-payment-status'), balance: v('m-balance'),
+    rcStatus: v('m-rc-status'), nocStatus: v('m-noc-status'),
+    insuranceStatus: v('m-insurance-status'),
     createdAt: editMotoId ? (motos.find(x=>x.id===editMotoId)||{}).createdAt||Date.now() : Date.now()
   };
   if(!m.make || !m.model) { alert('Make and Model are required.'); return; }
@@ -846,16 +900,29 @@ function openDetail(id) {
     <div class="detail-grid" style="margin-bottom:16px;">
       ${m.buyerName?`<div class="detail-item"><div class="detail-label">Name</div><div class="detail-value">${m.buyerName}</div></div>`:''}
       ${m.buyerPhone?`<div class="detail-item"><div class="detail-label">Phone</div><div class="detail-value">${m.buyerPhone}</div></div>`:''}
-      ${m.saleDate?`<div class="detail-item"><div class="detail-label">Sale Date</div><div class="detail-value">${m.saleDate}</div></div>`:''}
-      ${m.paymentMode?`<div class="detail-item"><div class="detail-label">Payment Mode</div><div class="detail-value">${m.paymentMode}</div></div>`:''}
+      ${m.saleDate?`<div class="detail-item"><div class="detail-label">Sale Date</div><div class="detail-value">${fmtDate(m.saleDate)}</div></div>`:''}
+      ${m.payCash?`<div class="detail-item"><div class="detail-label">Cash</div><div class="detail-value">₹${fmt(m.payCash)}</div></div>`:''}
+      ${m.payOnline?`<div class="detail-item"><div class="detail-label">Online</div><div class="detail-value">₹${fmt(m.payOnline)}</div></div>`:''}
+      ${m.payFinance?`<div class="detail-item"><div class="detail-label">Finance</div><div class="detail-value">₹${fmt(m.payFinance)}</div></div>`:''}
+      ${m.payExchange?`<div class="detail-item"><div class="detail-label">Exchange</div><div class="detail-value">₹${fmt(m.payExchange)}</div></div>`:''}
+      ${m.exchangeReg?`<div class="detail-item"><div class="detail-label">Exchange Reg. No.</div><div class="detail-value">${m.exchangeReg}</div></div>`:''}
+      ${m.exchangeType?`<div class="detail-item"><div class="detail-label">Exchange Vehicle</div><div class="detail-value">${m.exchangeType}</div></div>`:''}
       ${m.paymentStatus?`<div class="detail-item"><div class="detail-label">Payment Status</div><div class="detail-value" style="color:${m.paymentStatus==='Paid in Full'?'var(--green)':'var(--red)'}">${m.paymentStatus}</div></div>`:''}
       ${m.paymentStatus==='Partially Paid'&&m.balance?`<div class="detail-item"><div class="detail-label">Balance Due</div><div class="detail-value" style="color:var(--red);font-weight:700;">₹${fmt(m.balance)}</div></div>`:''}
       ${m.buyerAddress?`<div class="detail-item" style="grid-column:1/-1;"><div class="detail-label">Address</div><div class="detail-value">${m.buyerAddress}</div></div>`:''}
     </div>`:'<div style="color:var(--muted); font-size:13px; margin-bottom:14px;">Not sold yet</div>'}
+    ${(m.rcStatus||m.nocStatus||m.insuranceStatus)?`
+    <hr class="divider"/>
+    <div style="font-family:'Bebas Neue',sans-serif; font-size:15px; color:var(--accent); letter-spacing:1px; margin-bottom:10px;">DOCUMENT STATUS</div>
+    <div class="detail-grid" style="margin-bottom:16px;">
+      ${m.rcStatus?`<div class="detail-item"><div class="detail-label">RC Book</div><div class="detail-value" style="color:${m.rcStatus==='Received'||m.rcStatus==='Issued'?'var(--green)':m.rcStatus==='Pending'?'var(--accent)':'var(--red)'}">${m.rcStatus}</div></div>`:''}
+      ${m.nocStatus?`<div class="detail-item"><div class="detail-label">NOC</div><div class="detail-value" style="color:${m.nocStatus==='Received'||m.nocStatus==='Issued'?'var(--green)':m.nocStatus==='Pending'?'var(--accent)':'var(--red)'}">${m.nocStatus}</div></div>`:''}
+      ${m.insuranceStatus?`<div class="detail-item"><div class="detail-label">Insurance</div><div class="detail-value" style="color:${m.insuranceStatus==='Received'||m.insuranceStatus==='Issued'?'var(--green)':m.insuranceStatus==='Pending'?'var(--accent)':'var(--red)'}">${m.insuranceStatus}</div></div>`:''}
+    </div>`:''}
     ${exp.length?`
     <hr class="divider"/>
     <div style="font-family:'Bebas Neue',sans-serif; font-size:15px; color:var(--accent); letter-spacing:1px; margin-bottom:10px;">REPAIR EXPENSES</div>
-    ${exp.map(e=>`<div class="expense-row"><div class="expense-desc"><div style="font-weight:500;">${e.desc}</div><div style="font-size:12px; color:var(--muted);">${e.date} · <span class="tag">${e.category}</span></div></div><span class="expense-amount">-₹${fmt(e.amount)}</span></div>`).join('')}`:''}
+    ${exp.map(e=>`<div class="expense-row"><div class="expense-desc"><div style="font-weight:500;">${e.desc}</div><div style="font-size:12px; color:var(--muted);">${fmtDate(e.date)} · <span class="tag">${e.category}</span></div></div><span class="expense-amount">-₹${fmt(e.amount)}</span></div>`).join('')}`:''}
   `;
   document.getElementById('detail-footer').innerHTML = `
     <button class="btn btn-ghost" onclick="closeModal('modal-detail')">Close</button>
@@ -867,6 +934,7 @@ function openDetail(id) {
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 function v(id) { return document.getElementById(id).value.trim(); }
+function fmtDate(d) { if(!d) return '—'; try { return new Date(d).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}); } catch { return d; } }
 function fmt(n) { return Number(n||0).toLocaleString('en-IN',{minimumFractionDigits:0,maximumFractionDigits:0}); }
 function today() { return new Date().toISOString().slice(0,10); }
 
